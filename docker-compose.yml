@@ -1,0 +1,81 @@
+version: "3.9"
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: organic_care_db
+    environment:
+      POSTGRES_USER: organic_user
+      POSTGRES_PASSWORD: Nikhil@7
+      POSTGRES_DB: organic_care
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-organic_user} -d ${POSTGRES_DB:-organic_care}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: organic_care_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: organic_care_backend
+    env_file: .env
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://organic_user:Nikhil%407@db:5432/organic_care"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  ingestion:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: organic_care_ingestion
+    env_file: .env
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://organic_user:Nikhil%407@db:5432/organic_care"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: python -m ingestion.scheduler
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: organic_care_frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+    environment:
+      - API_URL=http://backend:8000
+
+volumes:
+  pg_data:

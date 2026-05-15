@@ -1,0 +1,182 @@
+@use '@angular/material' as mat;
+
+$organic-green: mat.define-palette(mat.$green-palette, 700, 400, 900);
+$organic-accent: mat.define-palette(mat.$amber-palette, 600);
+$organic-warn: mat.define-palette(mat.$red-palette);
+
+$organic-theme: mat.define-light-theme((
+  color: (
+    primary: $organic-green,
+    accent: $organic-accent,
+    warn: $organic-warn,
+  ),
+  typography: mat.define-typography-config(
+    $font-family: 'Inter, sans-serif',
+  ),
+  density: 0,
+));
+
+@include mat.all-component-themes($organic-theme);
+
+// ── Design tokens ──────────────────────────────────────────────
+:root {
+  --color-primary:     #2e7d32;
+  --color-light-green: #4caf50;
+  --color-bg:          #f2f5f0;
+  --color-card:        #ffffff;
+  --color-blue:        #1565c0;
+  --color-purple:      #6a1b9a;
+  --color-orange:      #f57c00;
+  --color-text:        #1a2a1a;
+  --color-muted:       #6b7c6b;
+  --radius-card:       16px;
+  --shadow-card:       0 2px 12px rgba(0,0,0,0.08);
+
+  // Bootstrap 5 theme overrides — keep organic green as primary
+  --bs-primary:             #2e7d32;
+  --bs-primary-rgb:         46, 125, 50;
+  --bs-success:             #4caf50;
+  --bs-success-rgb:         76, 175, 80;
+  --bs-link-color:          #2e7d32;
+  --bs-link-hover-color:    #1b5e20;
+  --bs-font-sans-serif:     'Inter', sans-serif;
+  --bs-body-font-family:    var(--bs-font-sans-serif);
+  --bs-body-bg:             #f2f5f0;
+  --bs-body-color:          #1a2a1a;
+  --bs-border-radius:       12px;
+  --bs-border-radius-sm:    8px;
+  --bs-border-radius-lg:    16px;
+  --bs-card-border-radius:  16px;
+}
+
+// Bootstrap btn-primary matches organic green
+.btn-primary {
+  --bs-btn-bg:              #2e7d32;
+  --bs-btn-border-color:    #2e7d32;
+  --bs-btn-hover-bg:        #1b5e20;
+  --bs-btn-hover-border-color: #1b5e20;
+  --bs-btn-active-bg:       #1b5e20;
+  --bs-btn-active-border-color: #1b5e20;
+  --bs-btn-disabled-bg:     #81c784;
+  --bs-btn-disabled-border-color: #81c784;
+}
+
+.btn-outline-primary {
+  --bs-btn-color:           #2e7d32;
+  --bs-btn-border-color:    #2e7d32;
+  --bs-btn-hover-bg:        #2e7d32;
+  --bs-btn-hover-border-color: #2e7d32;
+  --bs-btn-active-bg:       #2e7d32;
+}
+
+// ── Reset ───────────────────────────────────────────────────────
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+// ── Shell wrapper ────────────────────────────────────────────────
+.app-shell {
+  min-height: 100vh;
+  background: var(--color-bg);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+// ── Shared utilities ────────────────────────────────────────────
+.page-container {
+  width: 100%;
+  padding: 0 16px;
+}
+
+@media (min-width: 768px) {
+  .page-container {
+    padding: 0 32px;
+  }
+}
+
+.card-elevation {
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-card);
+}
+
+.mat-mdc-card {
+  border-radius: var(--radius-card) !important;
+}
+
+// ── Chips ───────────────────────────────────────────────────────
+.chip-organic {
+  background-color: #e8f5e9 !important;
+  color: #2e7d32 !important;
+  font-size: 12px !important;
+}
+
+.chip-ailment {
+  background-color: #fff3e0 !important;
+  color: #e65100 !important;
+}
+
+// ── Score badge ─────────────────────────────────────────────────
+.score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #2e7d32, #66bb6a);
+  color: white;
+  border-radius: 20px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+// ── Animations ──────────────────────────────────────────────────
+.fade-in {
+  animation: fadeIn 0.4s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.streaming-cursor::after {
+  content: '|';
+  animation: blink 1s step-end infinite;
+  color: #4caf50;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+// ── Skeleton loader ─────────────────────────────────────────────
+.skeleton {
+  background: linear-gradient(90deg, #e0e0e0 25%, #f5f5f5 50%, #e0e0e0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+// ── Quick chips ─────────────────────────────────────────────────
+.quick-chip {
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+}
