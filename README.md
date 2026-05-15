@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Organic Care AI
 
 **Personalized organic-food and wellness companion powered by RAG.**
@@ -276,3 +277,6 @@ AI_Organic_Care/
 - All SQL uses parameterized queries (SQLAlchemy)
 - No secrets in code — all from environment variables
 - Input validation with Pydantic v2 on all endpoints
+=======
+# AI-Organic-Care
+>>>>>>> b4384dfcc0bf93024f817f2e6a9d34a1a8618ebb
