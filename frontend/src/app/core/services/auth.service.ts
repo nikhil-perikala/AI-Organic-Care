@@ -21,7 +21,7 @@ export interface TokenOut {
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private http = inject(HttpClient);
-  private readonly apiUrl = environment.apiUrl;
+  private readonly apiUrl = `${environment.apiUrl}/api/v1`;
 
   currentUser = signal<UserOut | null>(null);
   isLoggedIn = signal(false);
@@ -29,7 +29,10 @@ export class AuthService {
   constructor() {
     if (this.getAccessToken()) {
       this.fetchMe().subscribe({
-        next: user => { this.currentUser.set(user); this.isLoggedIn.set(true); },
+        next: user => {
+          this.currentUser.set(user);
+          this.isLoggedIn.set(true);
+        },
         error: () => this.logout(),
       });
     }
@@ -37,12 +40,17 @@ export class AuthService {
 
   register(email: string, password: string, fullName?: string): Observable<UserOut> {
     return this.http.post<UserOut>(`${this.apiUrl}/auth/register`, {
-      email, password, full_name: fullName,
+      email,
+      password,
+      full_name: fullName,
     });
   }
 
   login(email: string, password: string): Observable<TokenOut> {
-    return this.http.post<TokenOut>(`${this.apiUrl}/auth/login`, { email, password }).pipe(
+    return this.http.post<TokenOut>(`${this.apiUrl}/auth/login`, {
+      email,
+      password,
+    }).pipe(
       tap(tokens => {
         localStorage.setItem('access_token', tokens.access_token);
         localStorage.setItem('refresh_token', tokens.refresh_token);
@@ -54,7 +62,10 @@ export class AuthService {
 
   refreshToken(): Observable<TokenOut> {
     const refresh_token = localStorage.getItem('refresh_token') ?? '';
-    return this.http.post<TokenOut>(`${this.apiUrl}/auth/refresh`, { refresh_token }).pipe(
+
+    return this.http.post<TokenOut>(`${this.apiUrl}/auth/refresh`, {
+      refresh_token,
+    }).pipe(
       tap(tokens => {
         localStorage.setItem('access_token', tokens.access_token);
         localStorage.setItem('refresh_token', tokens.refresh_token);
@@ -78,14 +89,22 @@ export class AuthService {
   }
 
   forgotPassword(email: string): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/forgot-password`, { email });
+    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/forgot-password`, {
+      email,
+    });
   }
 
   verifyOtp(email: string, otp: string): Observable<{ reset_token: string }> {
-    return this.http.post<{ reset_token: string }>(`${this.apiUrl}/auth/verify-otp`, { email, otp });
+    return this.http.post<{ reset_token: string }>(`${this.apiUrl}/auth/verify-otp`, {
+      email,
+      otp,
+    });
   }
 
   resetPassword(token: string, new_password: string): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/reset-password`, { token, new_password });
+    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/reset-password`, {
+      token,
+      new_password,
+    });
   }
 }
