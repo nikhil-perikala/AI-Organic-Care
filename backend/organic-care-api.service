@@ -32,6 +32,8 @@ WorkingDirectory=/home/ubuntu/AI-Organic-Care/backend
 Environment="PATH=/home/ubuntu/AI-Organic-Care/backend/.venv/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="PYTHONUNBUFFERED=1"
 Environment="PYTHONDONTWRITEBYTECODE=1"
+# Override docker-compose value in .env — systemd service reaches Redis via localhost
+Environment="REDIS_URL=redis://localhost:6379/0"
 
 # Bind to localhost only — Nginx proxies external traffic.
 # Use --workers 2 for a t2.micro; increase for larger instances.

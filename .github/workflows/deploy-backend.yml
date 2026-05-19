@@ -7,6 +7,7 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/deploy-backend.yml'
+      - 'backend/organic-care-api.service'
 
 jobs:
   deploy:
@@ -45,6 +46,15 @@ jobs:
 
             echo "Installing dependencies..."
             pip install -r requirements.txt --quiet
+
+            # Re-apply systemd service file if it changed (uses tee, no cp permission needed)
+            if ! diff -q ~/AI-Organic-Care/backend/organic-care-api.service \
+                         /etc/systemd/system/organic-care-api.service > /dev/null 2>&1; then
+              echo "Service file changed — updating systemd..."
+              sudo tee /etc/systemd/system/organic-care-api.service \
+                < ~/AI-Organic-Care/backend/organic-care-api.service > /dev/null
+              sudo systemctl daemon-reload
+            fi
 
             echo "Running database migrations..."
             alembic upgrade head

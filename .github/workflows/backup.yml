@@ -1,0 +1,70 @@
+name: Daily Backup & SSL Check
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # 2 AM UTC every day
+  workflow_dispatch:       # allow manual trigger any time
+
+jobs:
+  backup:
+    name: PostgreSQL Backup + SSL Check
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Database backup ─────────────────────────────────────────────────
+      - name: Backup PostgreSQL on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+
+            BACKUP_DIR="$HOME/backups"
+            mkdir -p "$BACKUP_DIR"
+            FILENAME="organic_care_$(date +%Y-%m-%d_%H%M%S).sql.gz"
+
+            echo "Starting backup → $BACKUP_DIR/$FILENAME"
+            docker exec organic_care_db pg_dump \
+              -U organic_user organic_care \
+              | gzip > "$BACKUP_DIR/$FILENAME"
+
+            SIZE=$(du -sh "$BACKUP_DIR/$FILENAME" | cut -f1)
+            echo "Backup complete: $FILENAME ($SIZE)"
+
+            # Keep only the 7 most recent backups
+            ls -t "$BACKUP_DIR"/*.sql.gz 2>/dev/null | tail -n +8 | xargs -r rm -f
+            echo "Retained backups:"
+            ls -lh "$BACKUP_DIR"/*.sql.gz
+
+      # ── 2. SSL certificate expiry check ───────────────────────────────────
+      - name: Check SSL cert expiry
+        run: |
+          DOMAIN="organic-care-api.duckdns.org"
+          echo "Checking SSL cert for $DOMAIN ..."
+
+          EXPIRY=$(echo | openssl s_client \
+            -connect "$DOMAIN:443" \
+            -servername "$DOMAIN" 2>/dev/null \
+            | openssl x509 -noout -enddate \
+            | cut -d= -f2)
+
+          echo "Certificate expires: $EXPIRY"
+
+          EXPIRY_EPOCH=$(date -d "$EXPIRY" +%s)
+          NOW_EPOCH=$(date +%s)
+          DAYS_LEFT=$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))
+
+          echo "Days remaining: $DAYS_LEFT"
+
+          if [ "$DAYS_LEFT" -lt 14 ]; then
+            echo "CRITICAL: cert expires in $DAYS_LEFT days — renew immediately!"
+            echo "Run on EC2: sudo certbot renew --force-renewal"
+            exit 1
+          elif [ "$DAYS_LEFT" -lt 30 ]; then
+            echo "WARNING: cert expires in $DAYS_LEFT days"
+          else
+            echo "SSL cert is healthy ($DAYS_LEFT days remaining)"
+          fi
