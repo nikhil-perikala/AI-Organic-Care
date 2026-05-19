@@ -106,11 +106,9 @@ jobs:
             source .venv/bin/activate
             pip install -r requirements.txt --quiet
 
-            # Best-effort schema rollback — skipped if migration has no downgrade
-            alembic downgrade -1 2>/dev/null \
-              && echo "Migration rolled back" \
-              || echo "Schema rollback skipped"
-
+            # Schema rollback intentionally skipped:
+            # migration 001 has no down_revision — downgrading would drop all tables.
+            # Code is reverted; DB keeps current schema (compatible with old code).
             sudo systemctl restart organic-care-api
             sleep 5
             curl -sf http://127.0.0.1:8000/health \
