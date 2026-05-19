@@ -1,14 +1,19 @@
+import os
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 from app.config import settings
+
+_testing = os.getenv("TESTING") == "1"
 
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=settings.APP_ENV == "development",
-    pool_size=10,
-    max_overflow=20,
-    pool_pre_ping=True,
+    # NullPool: every request opens/closes its own connection — no reuse.
+    # Required in tests to avoid asyncpg future-loop conflicts across tests.
+    poolclass=NullPool if _testing else None,
+    echo=False if _testing else settings.APP_ENV == "development",
+    **({} if _testing else {"pool_size": 10, "max_overflow": 20, "pool_pre_ping": True}),
 )
 
 AsyncSessionLocal = async_sessionmaker(

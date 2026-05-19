@@ -2,7 +2,8 @@ import uuid
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, cast
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
@@ -27,7 +28,7 @@ async def list_recipes(
         selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient)
     )
     if ailment:
-        stmt = stmt.where(Recipe.ailment_tags.contains([ailment]))
+        stmt = stmt.where(cast(Recipe.ailment_tags, JSONB).contains([ailment]))
     if meal_type:
         stmt = stmt.where(Recipe.meal_type == meal_type)
 
