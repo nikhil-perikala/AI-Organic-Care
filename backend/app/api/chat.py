@@ -10,6 +10,7 @@ from typing import List, Optional
 from sqlalchemy import select, delete, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+import structlog
 
 from app.database import get_db
 from app.core.deps import get_optional_user, get_current_user
@@ -18,6 +19,8 @@ from app.models.recipe import Recipe, RecipeIngredient
 from app.services.embedding_service import get_openai_client
 from app.services.rag_service import run_rag_pipeline
 from app.config import settings
+
+logger = structlog.get_logger()
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -384,14 +387,14 @@ async def chat_stream(
                         }
                         for ri in ing_rows
                     ]
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Failed to enrich recipe ingredients", error=str(e))
 
         rag_context = _build_rag_context(rag_results)
         if rag_context:
             system += f"\n\n---\n## 📚 Knowledge Base\n{rag_context}"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("RAG pipeline failed — chat will proceed without knowledge context", error=str(e))
 
     messages: list[dict] = [{"role": "system", "content": system}]
     for msg in payload.history[-10:]:
@@ -458,8 +461,8 @@ async def chat_stream(
 
                     scored.sort(key=lambda x: x["_s"], reverse=True)
                     recipe_refs = [{"id": m["id"], "title": m["title"]} for m in scored[:3]]
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Recipe ref matching failed", error=str(e))
 
             if user:
                 try:
@@ -473,8 +476,8 @@ async def chat_stream(
                     await db.commit()
                     await db.refresh(ai_msg)
                     ai_msg_id = str(ai_msg.id)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Failed to persist chat history", error=str(e))
 
         yield f"data: {json.dumps({'done': True, 'recipe_refs': recipe_refs, 'ai_msg_id': ai_msg_id})}\n\n"
 

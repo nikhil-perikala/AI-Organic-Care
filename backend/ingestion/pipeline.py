@@ -68,6 +68,10 @@ async def run_ingestion(mode: MODE = "full"):
     async with AsyncSessionLocal() as db:
         stored = await store_chunks(embedded_chunks, run_id, db)
 
+    if mode == "full":
+        curated_stored = await ingest_curated_knowledge()
+        stored += curated_stored
+
     elapsed = (datetime.utcnow() - start).total_seconds()
     logger.info(
         "Ingestion complete",

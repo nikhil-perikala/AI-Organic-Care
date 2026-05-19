@@ -23,7 +23,14 @@ async def get_profile(
     result = await db.execute(select(UserProfile).where(UserProfile.user_id == user.id))
     profile = result.scalar_one_or_none()
     if not profile:
-        return {}
+        return {
+            "dietary_preferences": [],
+            "allergies": [],
+            "health_goals": [],
+            "disliked_ingredients": [],
+            "liked_cuisines": [],
+            "serving_size": 2,
+        }
     return {
         "dietary_preferences": profile.dietary_preferences or [],
         "allergies": profile.allergies or [],
