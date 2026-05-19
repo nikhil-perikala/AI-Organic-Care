@@ -19,11 +19,13 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
 
           script: |
-            cd ~/AI-Organic-Care
+            set -euo pipefail
 
             echo "Pulling latest code..."
+            cd ~/AI-Organic-Care
             git pull origin main
 
             echo "Activating backend environment..."
@@ -31,12 +33,24 @@ jobs:
             source .venv/bin/activate
 
             echo "Installing dependencies..."
-            pip install -r requirements.txt
+            pip install -r requirements.txt --quiet
+
+            echo "Running database migrations..."
+            alembic upgrade head
 
             echo "Restarting backend service..."
             sudo systemctl restart organic-care-api
 
-            echo "Checking service..."
-            sudo systemctl is-active organic-care-api
-
-            echo "Deployment complete!"
+            echo "Checking service status..."
+            sleep 5
+            for i in 1 2 3 4 5; do
+              if curl -sf http://127.0.0.1:8000/health > /dev/null; then
+                echo "Health check passed"
+                exit 0
+              fi
+              echo "Attempt $i failed, retrying..."
+              sleep 5
+            done
+            echo "Health check failed — service logs:"
+            sudo journalctl -u organic-care-api -n 40 --no-pager
+            exit 1
