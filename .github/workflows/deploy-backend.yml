@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ── 1. SSH deploy ──────────────────────────────────────────────────────
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -24,9 +25,19 @@ jobs:
           script: |
             set -euo pipefail
 
-            echo "Pulling latest code..."
             cd ~/AI-Organic-Care
-            git pull origin main
+
+            # Save rollback point before touching anything
+            PREV_COMMIT=$(git rev-parse HEAD)
+            echo "$PREV_COMMIT" > /tmp/organic-care-prev-commit
+            echo "Rollback point: $(git log --oneline -1)"
+
+            # Reset --hard is safer than git pull:
+            # pull fails if EC2 has any local modifications; reset never does
+            echo "Pulling latest code..."
+            git fetch origin main
+            git reset --hard origin/main
+            echo "Deployed: $(git log --oneline -1)"
 
             echo "Activating backend environment..."
             cd backend
@@ -41,11 +52,11 @@ jobs:
             echo "Restarting backend service..."
             sudo systemctl restart organic-care-api
 
-            echo "Checking service status..."
+            echo "Waiting for service to start..."
             sleep 5
             for i in 1 2 3 4 5; do
               if curl -sf http://127.0.0.1:8000/health > /dev/null; then
-                echo "Health check passed"
+                echo "Local health check passed (attempt $i)"
                 exit 0
               fi
               echo "Attempt $i failed, retrying..."
@@ -54,3 +65,54 @@ jobs:
             echo "Health check failed — service logs:"
             sudo journalctl -u organic-care-api -n 40 --no-pager
             exit 1
+
+      # ── 2. HTTPS check from runner (verifies nginx + SSL + public DNS) ─────
+      - name: HTTPS health check
+        run: |
+          echo "Verifying https://organic-care-api.duckdns.org/health ..."
+          for i in 1 2 3; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              --max-time 15 https://organic-care-api.duckdns.org/health)
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "HTTPS health check passed (HTTP $HTTP_CODE)"
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $HTTP_CODE — retrying in 10 s..."
+            sleep 10
+          done
+          echo "HTTPS health check failed"
+          exit 1
+
+      # ── 3. Auto-rollback if any step above failed ──────────────────────────
+      - name: Rollback on failure
+        if: failure()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            if [ ! -f /tmp/organic-care-prev-commit ]; then
+              echo "No rollback point found — skipping"
+              exit 0
+            fi
+
+            PREV=$(cat /tmp/organic-care-prev-commit)
+            echo "Rolling back to $PREV ..."
+            cd ~/AI-Organic-Care
+            git reset --hard "$PREV"
+
+            cd backend
+            source .venv/bin/activate
+            pip install -r requirements.txt --quiet
+
+            # Best-effort schema rollback — skipped if migration has no downgrade
+            alembic downgrade -1 2>/dev/null \
+              && echo "Migration rolled back" \
+              || echo "Schema rollback skipped"
+
+            sudo systemctl restart organic-care-api
+            sleep 5
+            curl -sf http://127.0.0.1:8000/health \
+              && echo "Rollback successful — service healthy" \
+              || echo "WARNING: service still unhealthy after rollback"
