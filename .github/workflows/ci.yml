@@ -1,8 +1,10 @@
-name: CI/CD — Organic Care AI
+name: CI — Organic Care AI
 
+# Runs on PRs and develop pushes for fast feedback.
+# Main branch backend deploys are handled by deploy.yml.
 on:
   push:
-    branches: [main, develop]
+    branches: [develop]
   pull_request:
     branches: [main]
 
@@ -77,17 +79,3 @@ jobs:
         working-directory: frontend
         run: npm run build:prod
 
-  docker-build:
-    name: Docker Build
-    needs: [backend-test, frontend-build]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build backend image
-        run: docker build -t organic-care-backend ./backend
-
-      - name: Build frontend image
-        run: docker build -t organic-care-frontend ./frontend

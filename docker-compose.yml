@@ -1,13 +1,11 @@
-version: "3.9"
-
 services:
   db:
     image: pgvector/pgvector:pg16
     container_name: organic_care_db
     environment:
-      POSTGRES_USER: organic_user
-      POSTGRES_PASSWORD: Nikhil@7
-      POSTGRES_DB: organic_care
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -37,7 +35,7 @@ services:
     container_name: organic_care_backend
     env_file: .env
     environment:
-      DATABASE_URL: "postgresql+asyncpg://organic_user:Nikhil%407@db:5432/organic_care"
+      DATABASE_URL: ${DATABASE_URL_DOCKER}
     ports:
       - "8000:8000"
     depends_on:
@@ -48,6 +46,12 @@ services:
     volumes:
       - ./backend:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   ingestion:
     build:
@@ -56,7 +60,7 @@ services:
     container_name: organic_care_ingestion
     env_file: .env
     environment:
-      DATABASE_URL: "postgresql+asyncpg://organic_user:Nikhil%407@db:5432/organic_care"
+      DATABASE_URL: ${DATABASE_URL_DOCKER}
     depends_on:
       db:
         condition: service_healthy
@@ -73,9 +77,8 @@ services:
     ports:
       - "4200:80"
     depends_on:
-      - backend
-    environment:
-      - API_URL=http://backend:8000
+      backend:
+        condition: service_healthy
 
 volumes:
   pg_data:

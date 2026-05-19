@@ -21,7 +21,7 @@ export interface TokenOut {
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private http = inject(HttpClient);
-  private readonly apiUrl = `${environment.apiUrl}/api/v1`;
+  private readonly apiUrl = environment.apiUrl;
 
   currentUser = signal<UserOut | null>(null);
   isLoggedIn = signal(false);

@@ -1,0 +1,70 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Organic Care AI — FastAPI systemd service
+#
+# Install on EC2:
+#   sudo cp ~/AI-Organic-Care/backend/organic-care-api.service \
+#            /etc/systemd/system/organic-care-api.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable organic-care-api
+#   sudo systemctl start organic-care-api
+#
+# If your EC2 user is NOT "ubuntu", replace every occurrence below.
+# ──────────────────────────────────────────────────────────────────────────────
+
+[Unit]
+Description=Organic Care AI – FastAPI Backend
+Documentation=https://organic-care-api.duckdns.org/docs
+After=network.target
+# Ensures the service restarts after Docker (PostgreSQL) is ready
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=exec
+User=ubuntu
+Group=ubuntu
+
+# Working directory must be the backend folder so pydantic-settings
+# finds .env automatically (SettingsConfigDict env_file=".env")
+WorkingDirectory=/home/ubuntu/AI-Organic-Care/backend
+
+# Expose the venv bin dir first so all scripts resolve correctly
+Environment="PATH=/home/ubuntu/AI-Organic-Care/backend/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+Environment="PYTHONDONTWRITEBYTECODE=1"
+
+# Bind to localhost only — Nginx proxies external traffic.
+# Use --workers 2 for a t2.micro; increase for larger instances.
+ExecStart=/home/ubuntu/AI-Organic-Care/backend/.venv/bin/uvicorn \
+    app.main:app \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --workers 2 \
+    --log-level info \
+    --access-log
+
+# Graceful reload without dropping connections (useful for manual updates)
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Restart policy
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+# Logging — readable via: journalctl -u organic-care-api -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=organic-care-api
+
+# Graceful shutdown — wait up to 30 s for in-flight requests
+TimeoutStopSec=30
+KillMode=mixed
+KillSignal=SIGTERM
+
+# Minimal security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

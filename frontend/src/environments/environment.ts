@@ -1,4 +1,4 @@
 export const environment = {
   production: false,
-  apiUrl: 'https://organic-care-api.duckdns.org',
+  apiUrl: 'https://organic-care-api.duckdns.org/api/v1',
 };

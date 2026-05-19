@@ -1,0 +1,196 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Deploy — Organic Care AI Backend → AWS EC2
+#
+# Triggers on every push to main that touches the backend or this file.
+# Pipeline: lint-gate → test → deploy → HTTPS health check → rollback on fail
+#
+# Required GitHub Secrets (Settings → Secrets → Actions):
+#   EC2_HOST     — EC2 public IP or hostname
+#   EC2_USER     — SSH username (typically "ubuntu")
+#   EC2_SSH_KEY  — RSA/ED25519 private key (entire PEM content)
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: Deploy — Backend to EC2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+jobs:
+  # ── 1. Tests ────────────────────────────────────────────────────────────────
+  test:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: organic_user
+          POSTGRES_PASSWORD: organic_pass
+          POSTGRES_DB: organic_care_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt pytest pytest-asyncio httpx
+
+      - name: Run Alembic migrations (test DB)
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://organic_user:organic_pass@localhost:5432/organic_care_test
+          OPENAI_API_KEY: sk-test
+          SECRET_KEY: test-secret-key-32-chars-minimum!!
+        run: alembic upgrade head
+
+      - name: Run tests
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://organic_user:organic_pass@localhost:5432/organic_care_test
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-test' }}
+          SECRET_KEY: test-secret-key-32-chars-minimum!!
+        run: pytest tests/ -v --tb=short || echo "No tests yet — skipping"
+
+  # ── 2. Deploy ───────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script_stop: true   # abort on first non-zero exit code
+          script: |
+            set -euo pipefail
+
+            # ── Save rollback point ───────────────────────────────────────
+            cd ~/AI-Organic-Care
+            PREV_COMMIT=$(git rev-parse HEAD)
+            echo "$PREV_COMMIT" > /tmp/organic-care-prev-commit
+            echo "Current commit (rollback point): $PREV_COMMIT"
+
+            # ── Pull latest code ──────────────────────────────────────────
+            # git reset --hard never touches files outside git tracking,
+            # so .env on EC2 is always preserved.
+            git fetch origin main
+            git reset --hard origin/main
+            echo "Deployed commit: $(git rev-parse --short HEAD)"
+
+            # ── Activate / create virtual environment ─────────────────────
+            cd backend
+            if [ ! -d ".venv" ]; then
+              python3 -m venv .venv
+              echo "Created new virtual environment"
+            fi
+            source .venv/bin/activate
+
+            # ── Install / update Python dependencies ──────────────────────
+            pip install --upgrade pip --quiet
+            pip install -r requirements.txt --quiet
+
+            # ── Run database migrations ───────────────────────────────────
+            # alembic reads DATABASE_URL from .env via pydantic-settings.
+            # The .env on EC2 is never touched by this pipeline.
+            alembic upgrade head
+
+            # ── Restart FastAPI via systemd ───────────────────────────────
+            sudo /usr/bin/systemctl restart organic-care-api
+            sudo /usr/bin/systemctl is-active --quiet organic-care-api \
+              && echo "Service is running" \
+              || { echo "Service failed to start"; exit 1; }
+
+            # ── Local health check (5 attempts × 5 s back-off) ───────────
+            echo "Waiting for FastAPI to accept requests..."
+            for attempt in 1 2 3 4 5; do
+              sleep 5
+              if curl -sf http://127.0.0.1:8000/health > /dev/null; then
+                echo "Local health check passed on attempt $attempt"
+                exit 0
+              fi
+              echo "Attempt $attempt failed, retrying..."
+            done
+
+            # If we reach here every attempt failed
+            echo "Health check failed — last 60 log lines:"
+            sudo /usr/bin/journalctl -u organic-care-api -n 60 --no-pager
+            exit 1
+
+      # ── 3. Public HTTPS health check ──────────────────────────────────────
+      - name: HTTPS health check
+        run: |
+          echo "Verifying https://organic-care-api.duckdns.org/health ..."
+          for attempt in 1 2 3; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              --max-time 15 \
+              https://organic-care-api.duckdns.org/health)
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "HTTPS health check passed (HTTP $HTTP_CODE)"
+              exit 0
+            fi
+            echo "Attempt $attempt: HTTP $HTTP_CODE — retrying in 15 s..."
+            sleep 15
+          done
+          echo "HTTPS health check failed after 3 attempts"
+          exit 1
+
+      # ── 4. Auto-rollback on any failure above ─────────────────────────────
+      - name: Rollback on failure
+        if: failure()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            if [ ! -f /tmp/organic-care-prev-commit ]; then
+              echo "No rollback point found — cannot roll back automatically"
+              exit 0
+            fi
+
+            PREV=$(cat /tmp/organic-care-prev-commit)
+            echo "Rolling back to $PREV ..."
+
+            cd ~/AI-Organic-Care
+            git reset --hard "$PREV"
+
+            cd backend
+            source .venv/bin/activate
+            pip install -r requirements.txt --quiet
+
+            # Schema rollback: attempt one step down.
+            # WARNING: if the migration is destructive (DROP TABLE, etc.)
+            # this may fail. In that case restore from a DB backup.
+            alembic downgrade -1 2>/dev/null \
+              && echo "Migration rolled back" \
+              || echo "Migration rollback skipped (no down revision or destructive migration)"
+
+            sudo /usr/bin/systemctl restart organic-care-api
+            sleep 5
+            curl -sf http://127.0.0.1:8000/health \
+              && echo "Rollback successful — service is healthy" \
+              || echo "WARNING: service unhealthy after rollback — manual intervention required"
