@@ -969,9 +969,6 @@ export class HomeComponent implements OnInit, OnDestroy {
       .pipe(catchError(() => of([])))
       .subscribe(recipes => {
         this.recipeCount = recipes.length;
-        this.healthScore = recipes.length > 0
-          ? Math.round(recipes.reduce((s, r) => s + r.efficacy_score, 0) / recipes.length * 100)
-          : 0;
         this.rawDiscoveryRecipes.set(recipes);
         this.recipeCards.set(recipes.slice(0, 3).map(recipeToCard));
         this.loadingRecipes.set(false);
