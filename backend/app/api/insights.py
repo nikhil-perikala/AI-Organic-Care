@@ -1,5 +1,5 @@
 from collections import Counter
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -61,7 +61,7 @@ async def get_insights(
     ]
 
     # Session trend — last 14 days
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).date()
     trend_map: dict = {str(today - timedelta(days=i)): 0 for i in range(13, -1, -1)}
     for s in sessions:
         day = str(s.created_at.date())

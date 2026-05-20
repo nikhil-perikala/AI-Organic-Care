@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import Optional, List
 from sqlalchemy import String, Boolean, DateTime, ForeignKey, Text, JSON, Date, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -18,8 +18,8 @@ class User(Base):
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     reset_otp_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     reset_otp_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     profile: Mapped[Optional["UserProfile"]] = relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
     pantry_items: Mapped[List["UserPantry"]] = relationship("UserPantry", back_populates="user", cascade="all, delete-orphan")
@@ -41,8 +41,8 @@ class UserProfile(Base):
     disliked_ingredients: Mapped[Optional[List]] = mapped_column(JSON, default=list)
     liked_cuisines: Mapped[Optional[List]] = mapped_column(JSON, default=list)
     serving_size: Mapped[int] = mapped_column(default=2)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     user: Mapped["User"] = relationship("User", back_populates="profile")
 
@@ -58,7 +58,7 @@ class UserPantry(Base):
     category: Mapped[Optional[str]] = mapped_column(String(100))
     expiry_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     storage_tips: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     user: Mapped["User"] = relationship("User", back_populates="pantry_items")
 
@@ -70,7 +70,7 @@ class ChatHistory(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     user: Mapped["User"] = relationship("User", back_populates="chat_messages")
     feedback_items: Mapped[List["ChatFeedback"]] = relationship("ChatFeedback", back_populates="message", cascade="all, delete-orphan")
@@ -84,7 +84,7 @@ class ChatFeedback(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
     message_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_history.id", ondelete="CASCADE"))
     rating: Mapped[int] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     user: Mapped["User"] = relationship("User", back_populates="chat_feedback_items")
     message: Mapped["ChatHistory"] = relationship("ChatHistory", back_populates="feedback_items")

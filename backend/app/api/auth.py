@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
@@ -94,7 +94,7 @@ async def forgot_password(
     if user:
         otp = generate_otp()
         user.reset_otp_hash = hash_otp(otp)
-        user.reset_otp_expires_at = datetime.utcnow() + timedelta(minutes=OTP_TTL_MINUTES)
+        user.reset_otp_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=OTP_TTL_MINUTES)
         await db.commit()
         background_tasks.add_task(send_otp_email, user.email, otp)
         logger.info("Password reset OTP queued", email=user.email)
@@ -115,7 +115,7 @@ async def verify_otp(payload: VerifyOtpRequest, db: AsyncSession = Depends(get_d
     if not user or not user.reset_otp_hash or not user.reset_otp_expires_at:
         raise invalid_err
 
-    if datetime.utcnow() > user.reset_otp_expires_at:
+    if datetime.now(timezone.utc).replace(tzinfo=None) > user.reset_otp_expires_at:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Verification code has expired. Please request a new one.",

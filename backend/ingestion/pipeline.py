@@ -5,7 +5,7 @@ Incremental run (daily): collect new articles only → process → store.
 """
 import asyncio
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 import structlog
 
@@ -24,7 +24,7 @@ MODE = Literal["full", "incremental"]
 
 async def run_ingestion(mode: MODE = "full"):
     run_id = str(uuid.uuid4())[:8]
-    start = datetime.utcnow()
+    start = datetime.now(timezone.utc).replace(tzinfo=None)
     logger.info("Ingestion started", run_id=run_id, mode=mode)
 
     # Step 1: Collect raw documents
@@ -72,7 +72,7 @@ async def run_ingestion(mode: MODE = "full"):
         curated_stored = await ingest_curated_knowledge()
         stored += curated_stored
 
-    elapsed = (datetime.utcnow() - start).total_seconds()
+    elapsed = (datetime.now(timezone.utc).replace(tzinfo=None) - start).total_seconds()
     logger.info(
         "Ingestion complete",
         run_id=run_id,
@@ -184,11 +184,19 @@ CURATED_KNOWLEDGE = [
 async def ingest_curated_knowledge():
     """Ingest hand-curated knowledge into the vector store."""
     logger.info("Ingesting curated knowledge", count=len(CURATED_KNOWLEDGE))
+
+    # Delete previous curated entries so repeated full runs don't create duplicates
+    from sqlalchemy import delete as sa_delete
+    from app.models.knowledge import KnowledgeChunk
+    from app.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        await db.execute(sa_delete(KnowledgeChunk).where(KnowledgeChunk.ingestion_run_id == "curated-seed"))
+        await db.commit()
+
     clean_docs = clean_documents(CURATED_KNOWLEDGE)
     chunks = chunk_all_documents(clean_docs)
     embedded = await embed_all_chunks(chunks)
 
-    from app.database import AsyncSessionLocal
     async with AsyncSessionLocal() as db:
         stored = await store_chunks(embedded, "curated-seed", db)
 

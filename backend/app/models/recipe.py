@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from sqlalchemy import String, Float, Integer, DateTime, ForeignKey, Text, JSON, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -19,7 +19,7 @@ class Ingredient(Base):
     efficacy_score: Mapped[float] = mapped_column(Float, default=0.5)
     is_organic: Mapped[bool] = mapped_column(default=False)
     usda_food_id: Mapped[Optional[str]] = mapped_column(String(100))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     recipe_links: Mapped[List["RecipeIngredient"]] = relationship("RecipeIngredient", back_populates="ingredient")
 
@@ -44,8 +44,8 @@ class Recipe(Base):
     source_url: Mapped[Optional[str]] = mapped_column(String(1000))
     image_url: Mapped[Optional[str]] = mapped_column(String(1000))
     embedding: Mapped[Optional[List[float]]] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     recipe_ingredients: Mapped[List["RecipeIngredient"]] = relationship("RecipeIngredient", back_populates="recipe", cascade="all, delete-orphan")
 

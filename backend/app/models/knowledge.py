@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from sqlalchemy import String, DateTime, Text, JSON, Float, Index
 from sqlalchemy.orm import Mapped, mapped_column
@@ -24,7 +24,7 @@ class KnowledgeChunk(Base):
     language: Mapped[str] = mapped_column(String(10), default="en")
     chunk_index: Mapped[int] = mapped_column(default=0)
     token_count: Mapped[Optional[int]] = mapped_column()
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     ingestion_run_id: Mapped[Optional[str]] = mapped_column(String(100))
 
     __table_args__ = (
