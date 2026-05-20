@@ -27,9 +27,9 @@ jobs:
             FILENAME="organic_care_$(date +%Y-%m-%d_%H%M%S).sql.gz"
 
             echo "Starting backup → $BACKUP_DIR/$FILENAME"
-            docker exec organic_care_db pg_dump \
-              -U organic_user organic_care \
-              | gzip > "$BACKUP_DIR/$FILENAME"
+            sudo docker exec organic-care-db pg_dump \
+  -U organic_user organic_care \
+  | gzip > "$BACKUP_DIR/$FILENAME"
 
             SIZE=$(du -sh "$BACKUP_DIR/$FILENAME" | cut -f1)
             echo "Backup complete: $FILENAME ($SIZE)"
