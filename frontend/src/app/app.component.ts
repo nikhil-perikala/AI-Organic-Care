@@ -16,6 +16,16 @@ const NAV_TABS: NavTab[] = [
   { label: 'Profile', icon: 'person',           route: '/profile'      },
 ];
 
+const NAV_LEFT:  NavTab[] = [
+  { label: 'Home',    icon: 'home',            route: '/'        },
+  { label: 'Recipes', icon: 'restaurant_menu', route: '/meals'   },
+];
+const NAV_RIGHT: NavTab[] = [
+  { label: 'Health',  icon: 'favorite_border', route: '/insights' },
+  { label: 'Profile', icon: 'person',          route: '/profile'  },
+];
+const NAV_CENTER: NavTab = { label: '', icon: 'eco', route: '/chat' };
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -47,13 +57,21 @@ const NAV_TABS: NavTab[] = [
         }
 
         <nav class="flex-fill py-2">
-          @for (tab of tabs; track tab.route) {
+          @for (tab of [...navLeft, navCenter, ...navRight]; track tab.route) {
             <a class="sidebar-link d-flex align-items-center gap-3 px-4 py-3 text-decoration-none"
                [routerLink]="tab.route" [class.active]="isActive(tab.route)">
               <mat-icon>{{ tab.icon }}</mat-icon>
-              <span>{{ tab.label }}</span>
+              <span>{{ tab.label || 'AI Chat' }}</span>
             </a>
           }
+          <a class="sidebar-link d-flex align-items-center gap-3 px-4 py-3 text-decoration-none"
+             routerLink="/meal-planner" [class.active]="isActive('/meal-planner')">
+            <mat-icon>calendar_month</mat-icon><span>Planner</span>
+          </a>
+          <a class="sidebar-link d-flex align-items-center gap-3 px-4 py-3 text-decoration-none"
+             routerLink="/pantry" [class.active]="isActive('/pantry')">
+            <mat-icon>kitchen</mat-icon><span>Pantry</span>
+          </a>
         </nav>
 
         <div class="border-top py-2">
@@ -99,13 +117,21 @@ const NAV_TABS: NavTab[] = [
               {{ auth.currentUser()?.full_name || auth.currentUser()?.email }}
             </div>
           }
-          @for (tab of tabs; track tab.route) {
+          @for (tab of [...navLeft, navCenter, ...navRight]; track tab.route) {
             <a class="drawer-link d-flex align-items-center gap-3 px-4 py-3 text-decoration-none"
                [routerLink]="tab.route" (click)="menuOpen.set(false)">
               <mat-icon style="color:#6b7c6b">{{ tab.icon }}</mat-icon>
-              <span>{{ tab.label }}</span>
+              <span>{{ tab.label || 'AI Chat' }}</span>
             </a>
           }
+          <a class="drawer-link d-flex align-items-center gap-3 px-4 py-3 text-decoration-none"
+             routerLink="/meal-planner" (click)="menuOpen.set(false)">
+            <mat-icon style="color:#6b7c6b">calendar_month</mat-icon><span>Planner</span>
+          </a>
+          <a class="drawer-link d-flex align-items-center gap-3 px-4 py-3 text-decoration-none"
+             routerLink="/pantry" (click)="menuOpen.set(false)">
+            <mat-icon style="color:#6b7c6b">kitchen</mat-icon><span>Pantry</span>
+          </a>
           <div class="border-top mt-auto">
             @if (auth.isLoggedIn()) {
               <button class="drawer-link d-flex align-items-center gap-3 px-4 py-3 w-100 border-0 bg-transparent text-danger"
@@ -130,8 +156,20 @@ const NAV_TABS: NavTab[] = [
       </main>
 
       <!-- MOBILE bottom nav -->
-      <nav class="bottom-nav d-flex d-md-none border-top bg-white shadow-sm">
-        @for (tab of tabs; track tab.route) {
+      <nav class="bottom-nav d-flex d-md-none bg-white">
+        @for (tab of navLeft; track tab.route) {
+          <a class="nav-tab flex-fill d-flex flex-column align-items-center justify-content-center gap-1 text-decoration-none py-2"
+             [routerLink]="tab.route" [class.active]="isActive(tab.route)">
+            <mat-icon style="font-size:22px;width:22px;height:22px">{{ tab.icon }}</mat-icon>
+            <span class="nav-label">{{ tab.label }}</span>
+          </a>
+        }
+        <!-- Raised center AI button -->
+        <a class="nav-center-btn d-flex align-items-center justify-content-center text-decoration-none"
+           [routerLink]="navCenter.route">
+          <mat-icon style="font-size:26px;width:26px;height:26px;color:#fff">{{ navCenter.icon }}</mat-icon>
+        </a>
+        @for (tab of navRight; track tab.route) {
           <a class="nav-tab flex-fill d-flex flex-column align-items-center justify-content-center gap-1 text-decoration-none py-2"
              [routerLink]="tab.route" [class.active]="isActive(tab.route)">
             <mat-icon style="font-size:22px;width:22px;height:22px">{{ tab.icon }}</mat-icon>
@@ -222,19 +260,30 @@ const NAV_TABS: NavTab[] = [
     .bottom-nav {
       position: fixed; bottom: 0; left: 0; right: 0;
       height: 64px; z-index: 100;
+      border-top: 1px solid #EBEBEB;
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+      align-items: flex-end; padding-bottom: 8px;
     }
     .nav-tab {
-      color: #6b7c6b; font-size: 10px; font-weight: 500;
+      color: #BDBDBD; font-size: 10px; font-weight: 600;
       position: relative; transition: color 0.2s;
-      &.active { color: #2e7d32; }
-      &.active::before {
-        content: ''; position: absolute; top: 0;
-        left: 50%; transform: translateX(-50%);
-        width: 32px; height: 3px;
-        background: #2e7d32; border-radius: 0 0 4px 4px;
-      }
+      padding-bottom: 2px;
+      &.active { color: #2E7D32; }
+      mat-icon { transition: color 0.2s; }
     }
-    .nav-label { line-height: 1; }
+    .nav-label { line-height: 1; letter-spacing: 0.2px; }
+
+    /* Raised center AI button */
+    .nav-center-btn {
+      width: 52px; height: 52px; border-radius: 50%;
+      background: linear-gradient(135deg, #2E7D32, #4CAF50);
+      margin-bottom: 8px;
+      flex-shrink: 0;
+      box-shadow: 0 4px 14px rgba(46,125,50,0.45);
+      transition: transform 0.15s, box-shadow 0.15s;
+      &:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(46,125,50,0.5); }
+      &:active { transform: scale(0.94); }
+    }
 
     /* ── Animations ── */
     .fade-in { animation: fadeIn 0.25s ease-out; }
@@ -254,8 +303,11 @@ export class AppComponent {
   auth   = inject(AuthService);
   router = inject(Router);
 
-  tabs     = NAV_TABS;
-  menuOpen = signal(false);
+  tabs      = NAV_TABS;
+  navLeft   = NAV_LEFT;
+  navRight  = NAV_RIGHT;
+  navCenter = NAV_CENTER;
+  menuOpen  = signal(false);
   activeRoute = signal('/');
 
   constructor() {
