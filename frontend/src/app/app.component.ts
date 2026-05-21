@@ -426,12 +426,12 @@ export class AppComponent {
   activeRoute = signal('/');
 
   constructor() {
-    this.router.events
-      .pipe(filter(event => event instanceof NavigationEnd))
-      .subscribe((event: NavigationEnd) => {
-        this.activeRoute.set(event.urlAfterRedirects || event.url);
-      });
-  }
+  this.router.events
+    .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
+    .subscribe(event => {
+      this.activeRoute.set(event.urlAfterRedirects || event.url);
+    });
+}
 
   isActive(route: string): boolean {
     const current = this.activeRoute();
