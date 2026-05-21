@@ -57,7 +57,7 @@ const NAV_CENTER: NavTab = { label: '', icon: 'eco', route: '/chat' };
         }
 
         <nav class="flex-fill py-2">
-          @for (tab of [...navLeft, navCenter, ...navRight]; track tab.route) {
+          @for (tab of allNavItems; track tab.route) {
             <a class="sidebar-link d-flex align-items-center gap-3 px-4 py-3 text-decoration-none"
                [routerLink]="tab.route" [class.active]="isActive(tab.route)">
               <mat-icon>{{ tab.icon }}</mat-icon>
@@ -117,7 +117,7 @@ const NAV_CENTER: NavTab = { label: '', icon: 'eco', route: '/chat' };
               {{ auth.currentUser()?.full_name || auth.currentUser()?.email }}
             </div>
           }
-          @for (tab of [...navLeft, navCenter, ...navRight]; track tab.route) {
+          @for (tab of allNavItems; track tab.route) {
             <a class="drawer-link d-flex align-items-center gap-3 px-4 py-3 text-decoration-none"
                [routerLink]="tab.route" (click)="menuOpen.set(false)">
               <mat-icon style="color:#6b7c6b">{{ tab.icon }}</mat-icon>
