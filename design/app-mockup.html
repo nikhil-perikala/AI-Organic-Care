@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Organic Care — Mobile App Design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+body{
+  background:linear-gradient(160deg,#0a1f12 0%,#183324 50%,#0a1f12 100%);
+  min-height:100vh;padding:44px 36px 60px;
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  display:flex;flex-direction:column;align-items:center;
+}
+
+/* ── CANVAS TITLE ───────────────────────── */
+.c-head{text-align:center;margin-bottom:44px;color:#fff}
+.c-head .badge{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);
+  padding:6px 18px;border-radius:30px;margin-bottom:18px;
+  font-size:11px;font-weight:700;color:rgba(255,255,255,.65);letter-spacing:1.2px;text-transform:uppercase;
+}
+.c-head h1{font-size:36px;font-weight:900;letter-spacing:-1.8px;color:#fff;margin-bottom:7px}
+.c-head h1 em{color:#52B788;font-style:normal}
+.c-head p{font-size:13px;color:rgba(255,255,255,.4);letter-spacing:.3px}
+
+/* ── PHONES ROW ─────────────────────────── */
+.phones{display:flex;gap:20px;align-items:flex-start;justify-content:center;overflow-x:auto;padding:4px 0 16px}
+
+.pw{display:flex;flex-direction:column;align-items:center;gap:14px;flex-shrink:0}
+
+/* ── PHONE FRAME ────────────────────────── */
+.pf{
+  width:300px;height:628px;
+  background:linear-gradient(180deg,#2e2e2e,#161616);
+  border-radius:48px;padding:10px;
+  position:relative;
+  box-shadow:
+    0 60px 100px rgba(0,0,0,.6),
+    0 20px 40px rgba(0,0,0,.35),
+    inset 0 0 0 .5px rgba(255,255,255,.12),
+    inset 0 1px 0 rgba(255,255,255,.18);
+}
+/* Dynamic Island */
+.pf::before{
+  content:'';position:absolute;top:14px;left:50%;transform:translateX(-50%);
+  width:82px;height:24px;background:#080808;border-radius:14px;z-index:30;
+}
+/* Power button */
+.pf::after{
+  content:'';position:absolute;right:-3px;top:104px;
+  width:3px;height:48px;background:#252525;border-radius:0 2px 2px 0;
+  box-shadow:0 86px 0 #252525;
+}
+/* Volume */
+.vol{position:absolute;left:-3px;top:96px;width:3px;height:28px;background:#252525;border-radius:2px 0 0 2px;box-shadow:0 44px 0 #252525}
+
+.ps{
+  width:100%;height:100%;border-radius:40px;
+  overflow:hidden;position:relative;background:#fff;
+}
+
+/* ── SCREEN LABELS ──────────────────────── */
+.slabel{color:rgba(255,255,255,.38);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.3px;text-align:center}
+.snum{
+  display:inline-block;
+  background:rgba(82,183,136,.18);border:1px solid rgba(82,183,136,.35);
+  color:#52B788;font-size:10px;font-weight:800;
+  padding:3px 10px;border-radius:20px;margin-bottom:5px;letter-spacing:.8px;
+}
+
+/* ── STATUS BAR ─────────────────────────── */
+.sb{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:14px 18px 4px;font-size:11px;font-weight:800;color:#111;
+}
+.sb-r{display:flex;gap:4px;align-items:center}
+.sb-bars{display:flex;gap:2px;align-items:flex-end}
+.sb-bars span{display:block;width:3px;background:#111;border-radius:1px}
+.bat{width:20px;height:10px;border:1.5px solid #111;border-radius:2px;position:relative;display:flex;align-items:center;padding:1px}
+.bat::after{content:'';position:absolute;right:-4px;top:50%;transform:translateY(-50%);width:2px;height:4px;background:#111;border-radius:0 1px 1px 0}
+.bat-f{height:100%;width:77%;background:#2E7D32;border-radius:1px}
+
+/* ── PAGE HEADER ────────────────────────── */
+.pg-hdr{
+  display:flex;justify-content:space-between;align-items:flex-start;
+  padding:10px 16px 6px;background:#fff;
+}
+.pg-hdr-menu{font-size:18px;color:#333;line-height:1;cursor:pointer;padding-top:3px}
+.pg-hdr-center{flex:1;padding:0 12px}
+.pg-hdr-title{font-size:17px;font-weight:800;color:#111;letter-spacing:-.4px;margin-bottom:2px}
+.pg-hdr-sub{font-size:10.5px;color:#888;font-weight:400;line-height:1.45}
+.pg-hdr-icon{font-size:20px;color:#555;cursor:pointer;padding-top:2px}
+
+/* ── BOTTOM NAV ─────────────────────────── */
+.bnav{
+  position:absolute;bottom:0;left:0;right:0;
+  background:rgba(255,255,255,.97);
+  backdrop-filter:blur(16px);
+  border-top:.5px solid #EBEBEB;
+  padding:6px 0 18px;
+  display:flex;justify-content:space-around;align-items:flex-end;
+  z-index:50;border-radius:0 0 40px 40px;
+}
+.ni{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:2px 8px}
+.ni-ico{font-size:20px;line-height:1}
+.ni-lbl{font-size:9px;font-weight:600;color:#BDBDBD}
+.ni.a .ni-lbl{color:#2E7D32}
+/* Center raised button */
+.ni-center{
+  width:50px;height:50px;border-radius:50%;
+  background:linear-gradient(135deg,#2E7D32,#4CAF50);
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:4px;margin-top:-20px;
+  box-shadow:0 4px 14px rgba(46,125,50,.45);
+  cursor:pointer;flex-shrink:0;
+}
+.ni-center-ico{font-size:22px;line-height:1}
+
+/* ── SCROLL AREA ────────────────────────── */
+.cnt{overflow-y:auto;height:calc(100% - 104px);scrollbar-width:none}
+.cnt::-webkit-scrollbar{display:none}
+
+/* ── SHARED ─────────────────────────────── */
+.sec-row{display:flex;justify-content:space-between;align-items:center;padding:12px 16px 8px}
+.sec-title{font-size:13px;font-weight:700;color:#111;letter-spacing:-.2px}
+.sec-more{font-size:11px;color:#2E7D32;font-weight:600}
+
+/* Green pill tag */
+.gpill{
+  display:inline-flex;align-items:center;gap:4px;
+  background:#E8F5E9;color:#2E7D32;
+  font-size:9.5px;font-weight:700;
+  padding:4px 9px;border-radius:20px;letter-spacing:.1px;
+}
+
+/* Divider */
+.div{height:.5px;background:#F2F2F2;margin:0 16px}
+
+/* ════════════════════════════════════════ */
+/* SCREEN 1 — EXPLORE RECOMMENDATIONS      */
+/* ════════════════════════════════════════ */
+
+/* Big recommendation card */
+.rec-card{
+  margin:0 16px 12px;
+  background:#fff;border-radius:14px;
+  border:1px solid #F0F0F0;
+  overflow:hidden;
+}
+.rec-img{
+  height:138px;position:relative;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+}
+.rec-img-bg{position:absolute;inset:0}
+.rec-img-emo{font-size:64px;position:relative;z-index:2;filter:drop-shadow(0 4px 12px rgba(0,0,0,.2))}
+.rec-img-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 50%,rgba(0,0,0,.1) 100%);z-index:1}
+.rec-heart{
+  position:absolute;top:10px;right:10px;z-index:10;
+  width:30px;height:30px;border-radius:50%;
+  background:rgba(255,255,255,.9);
+  display:flex;align-items:center;justify-content:center;font-size:15px;
+  box-shadow:0 2px 8px rgba(0,0,0,.12);
+}
+.rec-body{padding:12px 14px 14px}
+.rec-title{font-size:14px;font-weight:800;color:#111;letter-spacing:-.3px;margin-bottom:3px}
+.rec-desc{font-size:11px;color:#777;margin-bottom:9px;line-height:1.45}
+.rec-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+
+.why-section{border-top:.5px solid #F2F2F2;padding-top:9px}
+.why-label{font-size:10px;font-weight:700;color:#444;margin-bottom:5px}
+.why-item{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.why-check{width:16px;height:16px;border-radius:50%;background:#E8F5E9;display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0}
+.why-text{font-size:11px;color:#555}
+
+/* List recommendation items */
+.more-list{padding:0 16px}
+.more-item{
+  display:flex;align-items:center;gap:11px;
+  padding:10px 0;border-bottom:.5px solid #F5F5F5;
+}
+.more-item:last-child{border-bottom:none}
+.more-thumb{
+  width:46px;height:46px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:22px;
+  flex-shrink:0;overflow:hidden;position:relative;
+}
+.more-info{flex:1}
+.more-name{font-size:12px;font-weight:700;color:#111;margin-bottom:2px;letter-spacing:-.2px}
+.more-sub{font-size:10.5px;color:#999;font-weight:500}
+.more-arrow{font-size:18px;color:#D0D0D0}
+
+/* ════════════════════════════════════════ */
+/* SCREEN 2 — BROWSE RECIPES               */
+/* ════════════════════════════════════════ */
+
+.search-wrap{padding:8px 16px 10px}
+.search-bar{
+  background:#F7F7F7;border-radius:10px;
+  padding:9px 12px;
+  display:flex;align-items:center;gap:8px;
+  border:1px solid #EFEFEF;
+}
+.s-ico{font-size:14px;color:#BDBDBD}
+.s-txt{font-size:12px;color:#BDBDBD;font-weight:500;flex:1}
+.s-filter{font-size:16px;color:#888}
+
+.cat-row{display:flex;gap:7px;padding:0 16px 10px;overflow-x:auto}
+.cat-row::-webkit-scrollbar{display:none}
+.chip{
+  padding:6px 13px;border-radius:20px;font-size:11px;font-weight:700;
+  white-space:nowrap;flex-shrink:0;cursor:pointer;
+}
+.chip-on{background:#2E7D32;color:#fff}
+.chip-off{background:#fff;color:#555;border:1px solid #E0E0E0}
+
+/* Popular recipe cards - 2 column */
+.pop-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;padding:0 16px}
+.pop-card{background:#fff;border-radius:12px;overflow:hidden;border:1px solid #F0F0F0}
+.pop-img{
+  height:98px;position:relative;
+  display:flex;align-items:center;justify-content:center;font-size:36px;overflow:hidden;
+}
+.pop-img-bg{position:absolute;inset:0}
+.pop-img-emo{position:relative;z-index:2;filter:drop-shadow(0 3px 8px rgba(0,0,0,.2))}
+.pop-heart{
+  position:absolute;top:7px;right:7px;z-index:10;
+  width:26px;height:26px;border-radius:50%;
+  background:rgba(255,255,255,.92);
+  display:flex;align-items:center;justify-content:center;font-size:12px;
+  box-shadow:0 1px 6px rgba(0,0,0,.12);
+}
+.pop-info{padding:9px 10px 11px}
+.pop-title{font-size:11px;font-weight:700;color:#111;margin-bottom:4px;line-height:1.3;letter-spacing:-.1px}
+.pop-meta{font-size:10px;color:#999;font-weight:500;display:flex;align-items:center;gap:3px}
+
+/* Category icons row */
+.cat-icons{display:flex;justify-content:space-around;padding:4px 14px 12px}
+.cat-icon-item{display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer}
+.cat-icon-circle{
+  width:44px;height:44px;border-radius:50%;background:#F7F7F7;
+  display:flex;align-items:center;justify-content:center;font-size:20px;
+  border:1px solid #EFEFEF;
+}
+.cat-icon-lbl{font-size:9.5px;font-weight:600;color:#666}
+
+/* Latest recipes list */
+.latest-item{
+  margin:0 16px 10px;
+  background:#fff;border-radius:12px;overflow:hidden;
+  display:flex;align-items:center;
+  border:1px solid #F0F0F0;
+  height:72px;
+}
+.latest-info{padding:12px 14px;flex:1}
+.latest-title{font-size:12px;font-weight:700;color:#111;margin-bottom:3px;letter-spacing:-.2px}
+.latest-meta{font-size:10.5px;color:#999;font-weight:500}
+.latest-img{
+  width:72px;height:72px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:30px;
+  position:relative;overflow:hidden;
+}
+.latest-img-bg{position:absolute;inset:0}
+.latest-img-emo{position:relative;z-index:2}
+.latest-arrow{font-size:16px;color:#D0D0D0;padding-right:10px}
+
+/* ════════════════════════════════════════ */
+/* SCREEN 3 — START PLANNING               */
+/* ════════════════════════════════════════ */
+
+/* Calendar widget */
+.cal-widget{
+  margin:0 16px 12px;
+  background:#fff;border-radius:14px;
+  border:1px solid #F0F0F0;padding:12px 14px;
+}
+.cal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.cal-month{font-size:13px;font-weight:800;color:#111;letter-spacing:-.2px}
+.cal-nav{display:flex;gap:6px}
+.cal-btn{
+  width:26px;height:26px;border-radius:50%;border:1px solid #E0E0E0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;color:#666;cursor:pointer;background:#fff;
+}
+.cal-days{display:flex;justify-content:space-between;margin-bottom:6px}
+.cal-day-lbl{font-size:9.5px;font-weight:600;color:#BDBDBD;text-align:center;flex:1;text-transform:uppercase}
+.cal-dates{display:flex;justify-content:space-between}
+.cal-date{
+  flex:1;height:32px;display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:600;color:#333;border-radius:50%;cursor:pointer;
+}
+.cal-date.active{background:#2E7D32;color:#fff;font-weight:800}
+.cal-date.dim{color:#BDBDBD}
+
+/* Plan section header */
+.plan-day-hdr{
+  padding:6px 16px 8px;
+  font-size:12px;font-weight:700;color:#111;letter-spacing:-.2px;
+}
+
+/* Meal list items */
+.meal-list{padding:0 16px}
+.meal-item{
+  display:flex;align-items:center;gap:11px;
+  padding:10px 0;border-bottom:.5px solid #F5F5F5;
+}
+.meal-item:last-child{border-bottom:none}
+.meal-thumb{
+  width:48px;height:48px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;font-size:24px;
+  flex-shrink:0;position:relative;overflow:hidden;
+}
+.meal-thumb-bg{position:absolute;inset:0}
+.meal-thumb-emo{position:relative;z-index:2}
+.meal-info{flex:1}
+.meal-type{font-size:9.5px;font-weight:700;color:#2E7D32;text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px}
+.meal-name{font-size:12px;font-weight:700;color:#111;margin-bottom:1px;letter-spacing:-.2px}
+.meal-time{font-size:10.5px;color:#BDBDBD;font-weight:500}
+.meal-arr{font-size:18px;color:#D0D0D0}
+
+/* Add meal button */
+.add-btn{
+  margin:12px 16px 14px;
+  background:#2E7D32;
+  color:#fff;border:none;border-radius:14px;
+  padding:15px;font-size:13px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  width:calc(100% - 32px);
+  box-shadow:0 4px 18px rgba(46,125,50,.35);
+  cursor:pointer;letter-spacing:-.1px;
+}
+
+/* ════════════════════════════════════════ */
+/* SCREEN 4 — SEE HEALTH TIPS              */
+/* ════════════════════════════════════════ */
+
+/* Daily tip hero card */
+.daily-tip{
+  margin:0 16px 12px;
+  border-radius:16px;overflow:hidden;
+  background:linear-gradient(130deg,#1B4D2E 0%,#2E7D32 50%,#388E3C 100%);
+  display:flex;align-items:stretch;min-height:110px;
+  box-shadow:0 6px 20px rgba(46,125,50,.28);
+  position:relative;
+}
+.daily-tip-text{
+  padding:16px 14px;flex:1;display:flex;flex-direction:column;justify-content:center;
+}
+.daily-tip-label{font-size:10px;font-weight:800;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.9px;margin-bottom:6px}
+.daily-tip-body{font-size:12.5px;font-weight:700;color:#fff;line-height:1.5;letter-spacing:-.1px}
+.daily-tip-img{
+  width:110px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:50px;
+  position:relative;overflow:hidden;
+}
+.daily-tip-img-bg{position:absolute;inset:0;background:rgba(255,255,255,.06)}
+.daily-tip-img-emo{position:relative;z-index:2;filter:drop-shadow(0 4px 10px rgba(0,0,0,.2))}
+.daily-tip-dots{
+  position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+  display:flex;gap:5px;
+}
+.tip-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.35)}
+.tip-dot.on{background:rgba(255,255,255,.9);width:18px;border-radius:3px}
+
+/* Article list items */
+.art-list{padding:0 16px}
+.art-item{
+  display:flex;align-items:center;gap:11px;
+  padding:10px 0;border-bottom:.5px solid #F5F5F5;
+}
+.art-item:last-child{border-bottom:none;padding-bottom:4px}
+.art-info{flex:1}
+.art-title{font-size:12px;font-weight:700;color:#111;margin-bottom:3px;line-height:1.35;letter-spacing:-.2px}
+.art-meta{font-size:10.5px;color:#BDBDBD;font-weight:500}
+.art-img{
+  width:62px;height:62px;border-radius:11px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:26px;
+  position:relative;overflow:hidden;
+}
+.art-img-bg{position:absolute;inset:0}
+.art-img-emo{position:relative;z-index:2}
+
+</style>
+</head>
+<body>
+
+<!-- CANVAS HEADER -->
+<div class="c-head">
+  <div class="badge">🌿 Organic Care AI · UI Design</div>
+  <h1>Mobile App <em>Screens</em></h1>
+  <p>4 iOS-style screens · Wellness &amp; Nutrition App</p>
+</div>
+
+<div class="phones">
+
+<!-- ══════════════════════════════════════ -->
+<!--   SCREEN 1 — EXPLORE RECOMMENDATIONS  -->
+<!-- ══════════════════════════════════════ -->
+<div class="pw">
+  <div class="pf">
+    <div class="vol"></div>
+    <div class="ps">
+
+      <!-- Status bar -->
+      <div class="sb">
+        <span>9:41</span>
+        <div class="sb-r">
+          <div class="sb-bars">
+            <span style="height:4px"></span><span style="height:7px"></span>
+            <span style="height:10px"></span><span style="height:13px"></span>
+          </div>
+          <span style="font-size:9px;font-weight:700;letter-spacing:.3px">WiFi</span>
+          <div class="bat"><div class="bat-f"></div></div>
+        </div>
+      </div>
+
+      <div class="cnt">
+
+        <!-- Page header -->
+        <div class="pg-hdr">
+          <div class="pg-hdr-menu">≡</div>
+          <div class="pg-hdr-center">
+            <div class="pg-hdr-title">Explore Recommendations</div>
+            <div class="pg-hdr-sub">Personalized picks just for you based on your health &amp; preferences</div>
+          </div>
+          <div class="pg-hdr-icon">🔔</div>
+        </div>
+
+        <!-- Recommended for You -->
+        <div class="sec-row">
+          <div class="sec-title">Recommended for You</div>
+          <div class="sec-more">View all</div>
+        </div>
+
+        <!-- Hero recommendation card -->
+        <div class="rec-card">
+          <div class="rec-img">
+            <div class="rec-img-bg" style="background:linear-gradient(135deg,#8BC34A 0%,#4CAF50 25%,#F4C430 55%,#E67E22 80%,#D35400 100%)"></div>
+            <div class="rec-img-overlay"></div>
+            <span class="rec-img-emo">🥗</span>
+            <div class="rec-heart">🤍</div>
+          </div>
+          <div class="rec-body">
+            <div class="rec-title">Immunity Booster Bowl</div>
+            <div class="rec-desc">High in protein, vitamins &amp; antioxidants</div>
+            <div class="rec-tags">
+              <span class="gpill">🌿 High Protein</span>
+              <span class="gpill">✦ Rich in Antioxidants</span>
+            </div>
+            <div class="why-section">
+              <div class="why-label">Why we recommend this?</div>
+              <div class="why-item">
+                <div class="why-check">✓</div>
+                <div class="why-text">Boosts Immunity</div>
+              </div>
+              <div class="why-item">
+                <div class="why-check">✓</div>
+                <div class="why-text">Good for Digestion</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- More Recommendations -->
+        <div class="sec-row">
+          <div class="sec-title">More Recommendations</div>
+        </div>
+
+        <div class="more-list">
+
+          <div class="more-item">
+            <div class="more-thumb">
+              <div style="position:absolute;inset:0;background:linear-gradient(135deg,#A8E6CF,#52B788)"></div>
+              <span style="position:relative;z-index:2;font-size:22px">🥤</span>
+            </div>
+            <div class="more-info">
+              <div class="more-name">Detox Green Smoothie</div>
+              <div class="more-sub">Energy · Hydrating · Detoxifying</div>
+            </div>
+            <div class="more-arrow">›</div>
+          </div>
+
+          <div class="more-item">
+            <div class="more-thumb">
+              <div style="position:absolute;inset:0;background:linear-gradient(135deg,#F9E79F,#F4D03F,#8BC34A)"></div>
+              <span style="position:relative;z-index:2;font-size:22px">🥗</span>
+            </div>
+            <div class="more-info">
+              <div class="more-name">Quinoa Veggie Salad</div>
+              <div class="more-sub">High Nutrition</div>
+            </div>
+            <div class="more-arrow">›</div>
+          </div>
+
+          <div class="more-item">
+            <div class="more-thumb">
+              <div style="position:absolute;inset:0;background:linear-gradient(135deg,#FAD7A0,#F0B27A,#E67E22)"></div>
+              <span style="position:relative;z-index:2;font-size:22px">🍵</span>
+            </div>
+            <div class="more-info">
+              <div class="more-name">Turmeric Ginger Tea</div>
+              <div class="more-sub">Anti-inflammatory · Warm &amp; Relaxing</div>
+            </div>
+            <div class="more-arrow">›</div>
+          </div>
+
+        </div>
+
+      </div><!-- /cnt -->
+
+      <!-- Bottom Nav -->
+      <div class="bnav">
+        <div class="ni a">
+          <div class="ni-ico">🏠</div>
+          <div class="ni-lbl">Home</div>
+        </div>
+        <div class="ni">
+          <div class="ni-ico">🍽️</div>
+          <div class="ni-lbl">Recipes</div>
+        </div>
+        <div class="ni-center">
+          <div class="ni-center-ico">🌱</div>
+        </div>
+        <div class="ni">
+          <div class="ni-ico">🫀</div>
+          <div class="ni-lbl">Health</div>
+        </div>
+        <div class="ni">
+          <div class="ni-ico">👤</div>
+          <div class="ni-lbl">Profile</div>
+        </div>
+      </div>
+
+    </div><!-- /ps -->
+  </div><!-- /pf -->
+  <div class="pw" style="gap:4px">
+    <div class="snum">01</div>
+    <div class="slabel">Explore Recommendations</div>
+  </div>
+</div><!-- /pw -->
+
+
+<!-- ══════════════════════════════════════ -->
+<!--   SCREEN 2 — BROWSE RECIPES           -->
+<!-- ══════════════════════════════════════ -->
+<div class="pw">
+  <div class="pf">
+    <div class="vol"></div>
+    <div class="ps">
+
+      <div class="sb">
+        <span>9:41</span>
+        <div class="sb-r">
+          <div class="sb-bars">
+            <span style="height:4px"></span><span style="height:7px"></span>
+            <span style="height:10px"></span><span style="height:13px"></span>
+          </div>
+          <span style="font-size:9px;font-weight:700;letter-spacing:.3px">WiFi</span>
+          <div class="bat"><div class="bat-f"></div></div>
+        </div>
+      </div>
+
+      <div class="cnt">
+
+        <div class="pg-hdr" style="align-items:center;padding-top:8px">
+          <div class="pg-hdr-center" style="padding-left:0">
+            <div class="pg-hdr-title">Browse Recipes</div>
+          </div>
+        </div>
+
+        <!-- Search -->
+        <div class="search-wrap">
+          <div class="search-bar">
+            <span class="s-ico">🔍</span>
+            <span class="s-txt">Search for recipes...</span>
+            <span class="s-filter">⚙️</span>
+          </div>
+        </div>
+
+        <!-- Category chips -->
+        <div class="cat-row">
+          <div class="chip chip-on">All</div>
+          <div class="chip chip-off">Breakfast</div>
+          <div class="chip chip-off">Lunch</div>
+          <div class="chip chip-off">Dinner</div>
+          <div class="chip chip-off">Snacks</div>
+        </div>
+
+        <!-- Popular Recipes -->
+        <div class="sec-row">
+          <div class="sec-title">Popular Recipes</div>
+          <div class="sec-more">View all</div>
+        </div>
+
+        <div class="pop-grid">
+
+          <div class="pop-card">
+            <div class="pop-img">
+              <div class="pop-img-bg" style="background:linear-gradient(135deg,#8BC34A,#4CAF50,#F4A261)"></div>
+              <span class="pop-img-emo">🥗</span>
+              <div class="pop-heart">🤍</div>
+            </div>
+            <div class="pop-info">
+              <div class="pop-title">Veggie Quinoa Bowl</div>
+              <div class="pop-meta">⏱ 20 min</div>
+            </div>
+          </div>
+
+          <div class="pop-card">
+            <div class="pop-img">
+              <div class="pop-img-bg" style="background:linear-gradient(135deg,#FDEBD0,#F5CBA7,#E59866)"></div>
+              <span class="pop-img-emo">🫐</span>
+              <div class="pop-heart">❤️</div>
+            </div>
+            <div class="pop-info">
+              <div class="pop-title">Oats &amp; Berries Breakfast Bowl</div>
+              <div class="pop-meta">⏱ 15 min</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Categories -->
+        <div class="sec-row" style="padding-top:14px">
+          <div class="sec-title">Categories</div>
+        </div>
+
+        <div class="cat-icons">
+          <div class="cat-icon-item">
+            <div class="cat-icon-circle">🍳</div>
+            <div class="cat-icon-lbl">Breakfast</div>
+          </div>
+          <div class="cat-icon-item">
+            <div class="cat-icon-circle">🥗</div>
+            <div class="cat-icon-lbl">Lunch</div>
+          </div>
+          <div class="cat-icon-item">
+            <div class="cat-icon-circle">🍲</div>
+            <div class="cat-icon-lbl">Dinner</div>
+          </div>
+          <div class="cat-icon-item">
+            <div class="cat-icon-circle">🍎</div>
+            <div class="cat-icon-lbl">Snacks</div>
+          </div>
+          <div class="cat-icon-item">
+            <div class="cat-icon-circle">🥤</div>
+            <div class="cat-icon-lbl">Drinks</div>
+          </div>
+        </div>
+
+        <!-- Latest Recipes -->
+        <div class="sec-row">
+          <div class="sec-title">Latest Recipes</div>
+        </div>
+
+        <div class="latest-item">
+          <div class="latest-info">
+            <div class="latest-title">Sweet Potato &amp; Black Bean Taco</div>
+            <div class="latest-meta">25 min · Easy</div>
+          </div>
+          <div class="latest-img">
+            <div class="latest-img-bg" style="background:linear-gradient(135deg,#F39C12,#E67E22,#D35400)"></div>
+            <span class="latest-img-emo">🌮</span>
+          </div>
+          <div class="latest-arrow">›</div>
+        </div>
+
+        <div class="latest-item" style="margin-bottom:16px">
+          <div class="latest-info">
+            <div class="latest-title">Mango Avocado Summer Salad</div>
+            <div class="latest-meta">10 min · Easy</div>
+          </div>
+          <div class="latest-img">
+            <div class="latest-img-bg" style="background:linear-gradient(135deg,#FAD7A0,#52B788,#2D6A4F)"></div>
+            <span class="latest-img-emo">🥑</span>
+          </div>
+          <div class="latest-arrow">›</div>
+        </div>
+
+      </div><!-- /cnt -->
+
+      <div class="bnav">
+        <div class="ni">
+          <div class="ni-ico">🏠</div>
+          <div class="ni-lbl">Home</div>
+        </div>
+        <div class="ni a">
+          <div class="ni-ico">🍽️</div>
+          <div class="ni-lbl">Recipes</div>
+        </div>
+        <div class="ni-center">
+          <div class="ni-center-ico">🌱</div>
+        </div>
+        <div class="ni">
+          <div class="ni-ico">🫀</div>
+          <div class="ni-lbl">Health</div>
+        </div>
+        <div class="ni">
+          <div class="ni-ico">👤</div>
+          <div class="ni-lbl">Profile</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <div class="pw" style="gap:4px">
+    <div class="snum">02</div>
+    <div class="slabel">Browse Recipes</div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════ -->
+<!--   SCREEN 3 — START PLANNING           -->
+<!-- ══════════════════════════════════════ -->
+<div class="pw">
+  <div class="pf">
+    <div class="vol"></div>
+    <div class="ps">
+
+      <div class="sb">
+        <span>9:41</span>
+        <div class="sb-r">
+          <div class="sb-bars">
+            <span style="height:4px"></span><span style="height:7px"></span>
+            <span style="height:10px"></span><span style="height:13px"></span>
+          </div>
+          <span style="font-size:9px;font-weight:700;letter-spacing:.3px">WiFi</span>
+          <div class="bat"><div class="bat-f"></div></div>
+        </div>
+      </div>
+
+      <div class="cnt">
+
+        <div class="pg-hdr">
+          <div class="pg-hdr-menu">≡</div>
+          <div class="pg-hdr-center">
+            <div class="pg-hdr-title">Start Planning</div>
+            <div class="pg-hdr-sub">Plan your meals, set your goals and stay on track with ease.</div>
+          </div>
+          <div class="pg-hdr-icon">📅</div>
+        </div>
+
+        <!-- Calendar widget -->
+        <div class="cal-widget">
+          <div class="cal-hdr">
+            <div class="cal-month">May 2025</div>
+            <div class="cal-nav">
+              <button class="cal-btn">‹</button>
+              <button class="cal-btn">›</button>
+            </div>
+          </div>
+          <div class="cal-days">
+            <div class="cal-day-lbl">Mon</div>
+            <div class="cal-day-lbl">Tue</div>
+            <div class="cal-day-lbl">Wed</div>
+            <div class="cal-day-lbl">Thu</div>
+            <div class="cal-day-lbl">Fri</div>
+            <div class="cal-day-lbl">Sat</div>
+            <div class="cal-day-lbl">Sun</div>
+          </div>
+          <div class="cal-dates">
+            <div class="cal-date dim">12</div>
+            <div class="cal-date dim">13</div>
+            <div class="cal-date active">14</div>
+            <div class="cal-date">15</div>
+            <div class="cal-date">16</div>
+            <div class="cal-date">17</div>
+            <div class="cal-date">18</div>
+          </div>
+        </div>
+
+        <!-- Plan heading -->
+        <div class="plan-day-hdr">Your Plan for Wed, 14 May</div>
+
+        <!-- Meal items -->
+        <div class="meal-list">
+
+          <div class="meal-item">
+            <div class="meal-thumb">
+              <div class="meal-thumb-bg" style="background:linear-gradient(135deg,#A8E6CF,#52B788)"></div>
+              <span class="meal-thumb-emo">🥤</span>
+            </div>
+            <div class="meal-info">
+              <div class="meal-type">Breakfast</div>
+              <div class="meal-name">Green Smoothie</div>
+              <div class="meal-time">8:05 AM</div>
+            </div>
+            <div class="meal-arr">›</div>
+          </div>
+
+          <div class="meal-item">
+            <div class="meal-thumb">
+              <div class="meal-thumb-bg" style="background:linear-gradient(135deg,#D5F5E3,#82E0AA,#52B788)"></div>
+              <span class="meal-thumb-emo">🥗</span>
+            </div>
+            <div class="meal-info">
+              <div class="meal-type">Lunch</div>
+              <div class="meal-name">Quinoa Veggie Bowl</div>
+              <div class="meal-time">1:00 PM</div>
+            </div>
+            <div class="meal-arr">›</div>
+          </div>
+
+          <div class="meal-item">
+            <div class="meal-thumb">
+              <div class="meal-thumb-bg" style="background:linear-gradient(135deg,#FDEBD0,#F0B27A,#E67E22)"></div>
+              <span class="meal-thumb-emo">🥘</span>
+            </div>
+            <div class="meal-info">
+              <div class="meal-type">Dinner</div>
+              <div class="meal-name">Grilled Paneer Salad</div>
+              <div class="meal-time">3:00 PM</div>
+            </div>
+            <div class="meal-arr">›</div>
+          </div>
+
+          <div class="meal-item">
+            <div class="meal-thumb">
+              <div class="meal-thumb-bg" style="background:linear-gradient(135deg,#FAD7A0,#F4D03F,#F39C12)"></div>
+              <span class="meal-thumb-emo">🍎</span>
+            </div>
+            <div class="meal-info">
+              <div class="meal-type">Snacks</div>
+              <div class="meal-name">Almonds &amp; Fruits</div>
+              <div class="meal-time">5:02 PM</div>
+            </div>
+            <div class="meal-arr">›</div>
+          </div>
+
+        </div>
+
+        <!-- Add meal button -->
+        <button class="add-btn">
+          <span style="font-size:18px;font-weight:300">＋</span> Add Meal
+        </button>
+
+      </div><!-- /cnt -->
+
+      <div class="bnav">
+        <div class="ni">
+          <div class="ni-ico">🏠</div>
+          <div class="ni-lbl">Home</div>
+        </div>
+        <div class="ni">
+          <div class="ni-ico">🍽️</div>
+          <div class="ni-lbl">Recipes</div>
+        </div>
+        <div class="ni-center">
+          <div class="ni-center-ico">🌱</div>
+        </div>
+        <div class="ni">
+          <div class="ni-ico">🫀</div>
+          <div class="ni-lbl">Health</div>
+        </div>
+        <div class="ni">
+          <div class="ni-ico">👤</div>
+          <div class="ni-lbl">Profile</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <div class="pw" style="gap:4px">
+    <div class="snum">03</div>
+    <div class="slabel">Start Planning</div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════ -->
+<!--   SCREEN 4 — SEE HEALTH TIPS          -->
+<!-- ══════════════════════════════════════ -->
+<div class="pw">
+  <div class="pf">
+    <div class="vol"></div>
+    <div class="ps">
+
+      <div class="sb">
+        <span>9:41</span>
+        <div class="sb-r">
+          <div class="sb-bars">
+            <span style="height:4px"></span><span style="height:7px"></span>
+            <span style="height:10px"></span><span style="height:13px"></span>
+          </div>
+          <span style="font-size:9px;font-weight:700;letter-spacing:.3px">WiFi</span>
+          <div class="bat"><div class="bat-f"></div></div>
+        </div>
+      </div>
+
+      <div class="cnt">
+
+        <div class="pg-hdr">
+          <div class="pg-hdr-menu">≡</div>
+          <div class="pg-hdr-center">
+            <div class="pg-hdr-title">See Health Tips</div>
+            <div class="pg-hdr-sub">Get expert tips and daily insights to live a healthier life.</div>
+          </div>
+          <div class="pg-hdr-icon">🔔</div>
+        </div>
+
+        <!-- Daily Tip section label -->
+        <div class="sec-row">
+          <div class="sec-title">Daily Tip</div>
+        </div>
+
+        <!-- Hero daily tip card -->
+        <div class="daily-tip">
+          <div class="daily-tip-text">
+            <div class="daily-tip-label">Today's Tip</div>
+            <div class="daily-tip-body">Start your day with warm lemon water to boost digestion and hydration.</div>
+          </div>
+          <div class="daily-tip-img">
+            <div class="daily-tip-img-bg"></div>
+            <span class="daily-tip-img-emo">🍋</span>
+          </div>
+          <div class="daily-tip-dots">
+            <div class="tip-dot on"></div>
+            <div class="tip-dot"></div>
+            <div class="tip-dot"></div>
+          </div>
+        </div>
+
+        <!-- Health Tips for You -->
+        <div class="sec-row">
+          <div class="sec-title">Health Tips for You</div>
+          <div class="sec-more">View all</div>
+        </div>
+
+        <div class="art-list">
+
+          <div class="art-item">
+            <div class="art-info">
+              <div class="art-title">7 Foods to Boost Your Immunity</div>
+              <div class="art-meta">5 min read</div>
+            </div>
+            <div class="art-img">
+              <div class="art-img-bg" style="background:linear-gradient(135deg,#E74C3C,#F1948A,#FAD7A0)"></div>
+              <span class="art-img-emo">🍅</span>
+            </div>
+          </div>
+
+          <div class="art-item">
+            <div class="art-info">
+              <div class="art-title">Benefits of Eating Seasonal Foods</div>
+              <div class="art-meta">6 min read</div>
+            </div>
+            <div class="art-img">
+              <div class="art-img-bg" style="background:linear-gradient(135deg,#8BC34A,#4CAF50,#2E7D32)"></div>
+              <span class="art-img-emo">🥦</span>
+            </div>
+          </div>
+
+          <div class="art-item">
+            <div class="art-info">
+              <div class="art-title">How to Improve Gut Health Naturally</div>
+              <div class="art-meta">8 min read</div>
+            </div>
+            <div class="art-img">
+              <div class="art-img-bg" style="background:linear-gradient(135deg,#F5F5F5,#ECEFF1,#CFD8DC)"></div>
+              <span class="art-img-emo">🫙</span>
+            </div>
+          </div>
+
+        </div>
+
+      </div><!-- /cnt -->
+
+      <div class="bnav">
+        <div class="ni">
+          <div class="ni-ico">🏠</div>
+          <div class="ni-lbl">Home</div>
+        </div>
+        <div class="ni">
+          <div class="ni-ico">🍽️</div>
+          <div class="ni-lbl">Recipes</div>
+        </div>
+        <div class="ni-center">
+          <div class="ni-center-ico">🌱</div>
+        </div>
+        <div class="ni a">
+          <div class="ni-ico">🫀</div>
+          <div class="ni-lbl">Health</div>
+        </div>
+        <div class="ni">
+          <div class="ni-ico">👤</div>
+          <div class="ni-lbl">Profile</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <div class="pw" style="gap:4px">
+    <div class="snum">04</div>
+    <div class="slabel">See Health Tips</div>
+  </div>
+</div>
+
+</div><!-- /phones -->
+
+<div style="margin-top:38px;text-align:center;color:rgba(255,255,255,.25);font-size:11px;font-weight:500;letter-spacing:.5px">
+  Organic Care AI · Mobile App Design System · 2026
+</div>
+
+</body>
+</html>
