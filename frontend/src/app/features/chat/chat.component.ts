@@ -470,7 +470,8 @@ export class ChatComponent implements AfterViewChecked, OnInit {
 
     const history = this.messages()
       .filter(m => !m.error)
-      .map(m => ({ role: m.role, content: m.content }));
+      .slice(-20)
+      .map(m => ({ role: m.role, content: m.content.slice(0, 3900) }));
 
     this.zone.run(() => {
       this.messages.update(m => [...m, { id: Date.now(), role: 'user', content: text }]);
