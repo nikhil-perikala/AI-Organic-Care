@@ -24,6 +24,13 @@ export interface PantryItem {
   added_at: string;
 }
 
+export interface ExtractedItem {
+  ingredient_name: string;
+  quantity: string | null;
+  unit: string | null;
+  expiry_date: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PantryService {
   private http = inject(HttpClient);
@@ -53,5 +60,14 @@ export class PantryService {
     return this.http.get<UsdaFood[]>(`${this.apiUrl}/foods/search`, {
       params: { q, limit: limit.toString() },
     });
+  }
+
+  uploadReceipt(file: File): Observable<{ items: ExtractedItem[] }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<{ items: ExtractedItem[] }>(
+      `${this.apiUrl}/pantry/upload-receipt`,
+      formData,
+    );
   }
 }
