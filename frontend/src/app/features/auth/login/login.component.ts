@@ -109,7 +109,13 @@ export class LoginComponent {
         this.router.navigateByUrl(returnUrl);
       },
       error: err => {
-        this.error.set(err.error?.detail || 'Invalid credentials. Please try again.');
+        if (err.status === 401) {
+          this.error.set('Invalid email or password. Please try again.');
+        } else if (err.status === 0) {
+          this.error.set('Cannot reach the server. Please check your connection.');
+        } else {
+          this.error.set(err.error?.detail || 'Login failed. Please try again.');
+        }
         this.loading.set(false);
       },
     });

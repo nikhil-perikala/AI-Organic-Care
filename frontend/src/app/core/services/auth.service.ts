@@ -55,7 +55,10 @@ export class AuthService {
         localStorage.setItem('access_token', tokens.access_token);
         localStorage.setItem('refresh_token', tokens.refresh_token);
         this.isLoggedIn.set(true);
-        this.fetchMe().subscribe(user => this.currentUser.set(user));
+        this.fetchMe().subscribe({
+          next: user => this.currentUser.set(user),
+          error: () => {},
+        });
       })
     );
   }
