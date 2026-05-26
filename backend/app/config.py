@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # CORS
-    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:4200", "http://localhost:3000"]
+    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:4200", "http://localhost:3000", "https://frontend-olive-five-95.vercel.app"]
 
     # Frontend (used to build password-reset links)
     FRONTEND_URL: str = "http://localhost:4200"
