@@ -18,7 +18,6 @@ const NAV_LEFT: NavTab[] = [
 ];
 
 const NAV_RIGHT: NavTab[] = [
-  { label: 'Health', icon: 'favorite_border', route: '/insights' },
   { label: 'Profile', icon: 'person', route: '/profile' },
 ];
 
@@ -52,9 +51,6 @@ const NAV_CENTER: NavTab = {
                 {{ auth.currentUser()?.email }}
               </div>
             </div>
-            <button class="sidebar-bell-btn" [routerLink]="'/notifications'" title="Notifications">
-              <mat-icon style="font-size:18px;width:18px;height:18px;line-height:1">notifications</mat-icon>
-            </button>
           </div>
         }
 
@@ -100,23 +96,17 @@ const NAV_CENTER: NavTab = {
         </div>
       </aside>
 
-      <nav class="navbar d-flex d-md-none px-2 bg-white border-bottom shadow-sm top-0 position-sticky"
-           style="z-index:100;height:56px">
-        <button class="btn btn-sm btn-light rounded-circle p-2"
-                (click)="menuOpen.set(!menuOpen())"
-                aria-label="Menu">
-          <mat-icon style="font-size:20px;line-height:1;display:block">menu</mat-icon>
-        </button>
-
-        <div class="d-flex align-items-center gap-1 fw-bold" style="color:#2e7d32;font-size:15px">
+      <nav class="navbar d-flex d-md-none px-3 bg-white border-bottom shadow-sm top-0 position-sticky"
+           style="z-index:100;height:56px;justify-content:center">
+        <div class="d-flex align-items-center gap-2 fw-bold" style="color:#2e7d32;font-size:16px">
           <mat-icon>eco</mat-icon>
           Organic Care
         </div>
 
-        <button class="btn btn-sm btn-light rounded-circle p-2 notif-bell-btn"
-                aria-label="Notifications"
-                [routerLink]="'/notifications'">
-          <mat-icon style="font-size:20px;line-height:1;display:block">notifications</mat-icon>
+        <button class="btn btn-sm btn-light rounded-circle p-2 position-absolute start-0 ms-2"
+                (click)="menuOpen.set(!menuOpen())"
+                aria-label="Menu">
+          <mat-icon style="font-size:20px;line-height:1;display:block">menu</mat-icon>
         </button>
       </nav>
 
@@ -207,6 +197,14 @@ const NAV_CENTER: NavTab = {
             <span class="nav-label">{{ tab.label }}</span>
           </a>
         }
+
+        <!-- Pantry tab fills the right slot since only Profile is in navRight -->
+        <a class="nav-tab flex-fill d-flex flex-column align-items-center justify-content-center gap-1 text-decoration-none py-2"
+           routerLink="/pantry"
+           [class.active]="isActive('/pantry')">
+          <mat-icon style="font-size:22px;width:22px;height:22px">kitchen</mat-icon>
+          <span class="nav-label">Pantry</span>
+        </a>
       </nav>
 
       @if (!isActive('/chat') && !isActive('/notifications') && !activeRoute().startsWith('/auth')) {
@@ -278,26 +276,6 @@ const NAV_CENTER: NavTab = {
       justify-content: center;
       font-size: 13px;
       font-weight: 700;
-    }
-
-    .sidebar-bell-btn {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      border: none;
-      background: #f2f5f0;
-      color: #6b7c6b;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    .sidebar-bell-btn:hover {
-      background: #e8f5e9;
-      color: #2e7d32;
     }
 
     .drawer-backdrop {
@@ -426,12 +404,12 @@ export class AppComponent {
   activeRoute = signal('/');
 
   constructor() {
-  this.router.events
-    .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
-    .subscribe(event => {
-      this.activeRoute.set(event.urlAfterRedirects || event.url);
-    });
-}
+    this.router.events
+      .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
+      .subscribe(event => {
+        this.activeRoute.set(event.urlAfterRedirects || event.url);
+      });
+  }
 
   isActive(route: string): boolean {
     const current = this.activeRoute();

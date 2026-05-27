@@ -16,6 +16,7 @@ interface ModeCard   { key: string; emoji: string; title: string; subtitle: stri
 interface RecipeCard { id: string; title: string; emoji: string; cardBg: string; matchPct: number; matchBg: string; time: string; difficulty: string; chip: string; chipBg: string; imageUrl: string; }
 interface RecipeIngredientDetail { ingredient: { id: string; name: string; category: string | null }; quantity: string | null; unit: string | null; notes: string | null; is_optional: boolean; }
 interface RecipeDetail { id: string; title: string; description: string | null; instructions: string | null; prep_time_minutes: number | null; cook_time_minutes: number | null; servings: number; cuisine_type: string | null; meal_type: string | null; ailment_tags: string[]; health_benefits: string[]; dietary_labels: string[]; efficacy_score: number; recipe_ingredients: RecipeIngredientDetail[]; }
+interface PantryItemLocal { id: string; ingredient_name: string; quantity: string | null; unit: string | null; category: string | null; expiry_date: string | null; storage_tips: string | null; added_at: string; }
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -64,6 +65,13 @@ const MEAL_ICON: Record<string, string> = { breakfast: 'free_breakfast', lunch: 
 
 const IMG_FALLBACK = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=300&auto=format&fit=crop&q=80';
 const IMG_STOP = new Set(['a','an','the','with','and','or','of','in','on','for','to','my','your','our','its','from','made','style','easy','quick','healthy','organic','fresh']);
+
+const CAT_EMOJI_MAP: Record<string, string> = {
+  'Leafy Greens': '🥬', 'Vegetables': '🥦', 'Fruits': '🍎', 'Berries': '🫐',
+  'Nuts & Seeds': '🌰', 'Grains': '🌾',    'Legumes': '🫘', 'Fish & Seafood': '🐟',
+  'Meat & Poultry': '🍗', 'Dairy': '🥛',  'Herbs & Spices': '🌿', 'Oils': '🫙',
+  'Sweeteners': '🍯', 'Adaptogens': '🍵',
+};
 
 function titleToImageUrl(title: string, mealType: string | null): string {
   const words = title.toLowerCase()
@@ -123,24 +131,15 @@ function getGreeting(): string {
 
   <!-- ── S1: Greeting banner ─────────────────────────────── -->
   <div class="greeting-banner px-4 py-3">
-    <div class="d-flex align-items-center justify-content-between">
-      <div class="d-flex align-items-center gap-3">
-        <div class="health-logo flex-shrink-0">
-          <mat-icon style="font-size:24px;color:#2e7d32">eco</mat-icon>
-        </div>
-        <div>
-          <h1 class="fw-bold text-white mb-0" style="font-size:clamp(16px,4vw,22px);line-height:1.2">
-            {{ greeting }}, {{ userName }} 👋
-          </h1>
-          <p class="mb-0 small" style="color:rgba(255,255,255,0.65)">Eat Organic, Live Healthy</p>
-        </div>
+    <div class="d-flex align-items-center gap-3">
+      <div class="health-logo flex-shrink-0">
+        <mat-icon style="font-size:24px;color:#2e7d32">eco</mat-icon>
       </div>
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn p-0 border-0 position-relative notif-btn" (click)="goToInsights()">
-          <mat-icon style="color:rgba(255,255,255,0.9);font-size:24px;width:24px;height:24px">notifications</mat-icon>
-          <span class="notif-badge">3</span>
-        </button>
-        <div class="user-avatar">{{ userName.charAt(0).toUpperCase() }}</div>
+      <div>
+        <h1 class="fw-bold text-white mb-0" style="font-size:clamp(16px,4vw,22px);line-height:1.2">
+          {{ greeting }}, {{ userName }} 👋
+        </h1>
+        <p class="mb-0 small" style="color:rgba(255,255,255,0.65)">Eat Organic, Live Healthy</p>
       </div>
     </div>
   </div>
@@ -163,7 +162,6 @@ function getGreeting(): string {
         </div>
       }
     </div>
-    <!-- Dot indicators -->
     <div class="hero-dots">
       @for (slide of heroSlides; track $index) {
         <button class="hero-dot" [class.hero-dot-active]="currentHeroSlide() === $index"
@@ -172,91 +170,265 @@ function getGreeting(): string {
     </div>
   </div>
 
-  <!-- ── S2: Health Score Card ────────────────────────────── -->
-  <div class="px-3 px-md-4 mt-3">
-    <div class="card border-0 shadow-sm" style="border-radius:16px">
-      <div class="card-body p-3 p-md-4">
-        <div class="d-flex align-items-center gap-3 gap-md-4 flex-wrap flex-md-nowrap">
+  <!-- ── S2: Pantry Summary ─────────────────────────────── -->
+  @if (auth.isLoggedIn()) {
+    <div class="px-3 px-md-4 mt-4">
 
-          <!-- Circular progress ring -->
-          <div class="score-ring-wrap flex-shrink-0">
-            <svg width="88" height="88" viewBox="0 0 88 88">
-              <circle cx="44" cy="44" r="36" fill="none" stroke="#e8f5e9" stroke-width="7"/>
-              <circle cx="44" cy="44" r="36" fill="none" stroke="#4caf50" stroke-width="7"
-                stroke-linecap="round"
-                [attr.stroke-dasharray]="226.2"
-                [attr.stroke-dashoffset]="226.2 * (1 - healthScore / 100)"
-                transform="rotate(-90 44 44)"
-                style="transition:stroke-dashoffset 0.8s ease"/>
-            </svg>
-            <div class="score-ring-inner">
-              <mat-icon style="font-size:20px;width:20px;height:20px;color:#2e7d32">eco</mat-icon>
+      <!-- Section header -->
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <div>
+          <h2 class="section-title mb-0 d-flex align-items-center gap-2">
+            <mat-icon style="font-size:20px;width:20px;height:20px;color:#2e7d32">kitchen</mat-icon>
+            Your Pantry Summary
+          </h2>
+          <p class="text-muted mb-0 mt-1" style="font-size:12px">
+            {{ pantryCount }} ingredient{{ pantryCount !== 1 ? 's' : '' }} tracked
+          </p>
+        </div>
+        <button class="btn fw-semibold d-flex align-items-center gap-1"
+          style="background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border-radius:10px;font-size:12px;padding:8px 16px;border:none;box-shadow:0 2px 8px rgba(46,125,50,.25)"
+          (click)="goToPantry()">
+          <mat-icon style="font-size:15px;width:15px;height:15px">kitchen</mat-icon>
+          Manage Pantry
+        </button>
+      </div>
+
+      <!-- 4 Stat cards -->
+      <div class="row g-2 mb-3">
+        <div class="col-6 col-sm-3">
+          <div class="ps-stat-card" style="background:#f8fdf8;border-color:#c8e6c9">
+            <div class="ps-stat-icon" style="background:#e8f5e9">
+              <mat-icon style="color:#2e7d32;font-size:18px;width:18px;height:18px">kitchen</mat-icon>
+            </div>
+            <div class="fw-bold" style="font-size:26px;color:#1a2a1a;line-height:1.1">{{ pantryCount }}</div>
+            <div class="text-muted" style="font-size:11px;margin:3px 0">Total Items</div>
+            <span class="ps-pill"
+              [style.background]="pantryCount > 10 ? '#e8f5e9' : pantryCount > 0 ? '#fff3e0' : '#f5f5f5'"
+              [style.color]="pantryCount > 10 ? '#2e7d32' : pantryCount > 0 ? '#f57c00' : '#9e9e9e'">
+              {{ pantryCount > 10 ? 'Well stocked' : pantryCount > 0 ? 'Building up' : 'Empty' }}
+            </span>
+          </div>
+        </div>
+        <div class="col-6 col-sm-3">
+          <div class="ps-stat-card" style="background:#fff8f0;border-color:#ffcc80;cursor:pointer" (click)="goToPantry()">
+            <div class="ps-stat-icon" style="background:#fff3e0">
+              <mat-icon style="color:#f57c00;font-size:18px;width:18px;height:18px">schedule</mat-icon>
+            </div>
+            <div class="fw-bold" style="font-size:26px;color:#e65100;line-height:1.1">{{ expiringSoonCount() }}</div>
+            <div class="text-muted" style="font-size:11px;margin:3px 0">Expiring Soon</div>
+            <span class="ps-pill"
+              [style.background]="expiringSoonCount() > 0 ? '#fff3e0' : '#e8f5e9'"
+              [style.color]="expiringSoonCount() > 0 ? '#f57c00' : '#2e7d32'">
+              {{ expiringSoonCount() > 0 ? 'Act now!' : 'All fresh!' }}
+            </span>
+          </div>
+        </div>
+        <div class="col-6 col-sm-3">
+          <div class="ps-stat-card" style="background:#f0f4ff;border-color:#9fa8da;cursor:pointer" (click)="goToPantry()">
+            <div class="ps-stat-icon" style="background:#e3f2fd">
+              <mat-icon style="color:#1565c0;font-size:18px;width:18px;height:18px">inventory_2</mat-icon>
+            </div>
+            <div class="fw-bold" style="font-size:26px;color:#1565c0;line-height:1.1">{{ lowStockCount() }}</div>
+            <div class="text-muted" style="font-size:11px;margin:3px 0">Low Stock</div>
+            <span class="ps-pill"
+              [style.background]="lowStockCount() > 0 ? '#e3f2fd' : '#e8f5e9'"
+              [style.color]="lowStockCount() > 0 ? '#1565c0' : '#2e7d32'">
+              {{ lowStockCount() > 0 ? 'Restock' : 'Good stock' }}
+            </span>
+          </div>
+        </div>
+        <div class="col-6 col-sm-3">
+          <div class="ps-stat-card" style="background:#fdf5ff;border-color:#ce93d8;cursor:pointer" (click)="goToPantryRecipes()">
+            <div class="ps-stat-icon" style="background:#f3e5f5">
+              <mat-icon style="color:#6a1b9a;font-size:18px;width:18px;height:18px">dinner_dining</mat-icon>
+            </div>
+            <div class="fw-bold" style="font-size:26px;color:#6a1b9a;line-height:1.1">{{ recipeCount }}</div>
+            <div class="text-muted" style="font-size:11px;margin:3px 0">Recipe Matches</div>
+            <span class="ps-pill"
+              [style.background]="recipeCount > 0 ? '#f3e5f5' : '#f5f5f5'"
+              [style.color]="recipeCount > 0 ? '#6a1b9a' : '#9e9e9e'">
+              {{ recipeCount > 0 ? 'Cook now!' : 'Add items' }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Freshness bar -->
+      <div class="card border-0 shadow-sm mb-3" style="border-radius:14px">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="fw-semibold d-flex align-items-center gap-2" style="font-size:13px;color:#1a2a1a">
+              <mat-icon style="font-size:16px;width:16px;height:16px;color:#4caf50">eco</mat-icon>
+              Pantry Freshness
+            </div>
+            <div class="fw-bold" style="font-size:16px"
+              [style.color]="freshnessPercent() > 70 ? '#2e7d32' : freshnessPercent() > 40 ? '#f57c00' : '#c62828'">
+              {{ freshnessPercent() }}%
             </div>
           </div>
-
-          <!-- Score text -->
-          <div class="score-text flex-shrink-0 pe-3 pe-md-4" style="border-right:1px solid #f0f0f0">
-            <div class="text-muted" style="font-size:11px;white-space:nowrap">Your Health Score</div>
-            <div class="fw-bold" style="font-size:28px;color:#2e7d32;line-height:1.1">
-              {{ healthScore }}<span style="font-size:14px;color:#9e9e9e">/100</span>
-            </div>
-            <div class="small" style="color:#4caf50">Great progress — keep it up!</div>
-          </div>
-
-          <!-- Stat columns -->
-          <div class="flex-fill">
-            <div class="row g-0 text-center">
-              <div class="col-3">
-                <button class="stat-btn w-100 py-1 border-0 bg-transparent" (click)="goToPantry()">
-                  <div class="stat-icon-wrap mx-auto mb-1">
-                    <mat-icon class="stat-icon">kitchen</mat-icon>
-                  </div>
-                  <div class="fw-bold" style="font-size:15px">{{ pantryCount }}</div>
-                  <div class="text-muted" style="font-size:10px">Pantry Items</div>
-                  <span class="stat-badge"
-                    [style.background]="pantryCount > 5 ? '#e8f5e9' : '#fff3e0'"
-                    [style.color]="pantryCount > 5 ? '#2e7d32' : '#f57c00'">
-                    {{ pantryCount > 5 ? 'Well stocked' : pantryCount > 0 ? 'Add more' : 'Empty' }}
-                  </span>
-                </button>
-              </div>
-              <div class="col-3">
-                <button class="stat-btn w-100 py-1 border-0 bg-transparent" (click)="goToPantryRecipes()">
-                  <div class="stat-icon-wrap mx-auto mb-1">
-                    <mat-icon class="stat-icon">dinner_dining</mat-icon>
-                  </div>
-                  <div class="fw-bold" style="font-size:15px">{{ recipeCount }}</div>
-                  <div class="text-muted" style="font-size:10px">Recipes</div>
-                  <span class="stat-badge" style="background:#e0f2f1;color:#00897b">Explore more</span>
-                </button>
-              </div>
-              <div class="col-3">
-                <button class="stat-btn w-100 py-1 border-0 bg-transparent" (click)="goToInsights()">
-                  <div class="stat-icon-wrap mx-auto mb-1">
-                    <mat-icon class="stat-icon">bar_chart</mat-icon>
-                  </div>
-                  <div class="fw-bold" style="font-size:15px">{{ activeDays }}</div>
-                  <div class="text-muted" style="font-size:10px">Active Days</div>
-                  <span class="stat-badge" style="background:#e8f5e9;color:#2e7d32">Keep it going!</span>
-                </button>
-              </div>
-              <div class="col-3">
-                <button class="stat-btn w-100 py-1 border-0 bg-transparent" (click)="goToFavourites()">
-                  <div class="stat-icon-wrap mx-auto mb-1">
-                    <mat-icon class="stat-icon" style="color:#e53935">favorite</mat-icon>
-                  </div>
-                  <div class="fw-bold" style="font-size:15px">{{ auth.isLoggedIn() ? favouriteCards().length : '–' }}</div>
-                  <div class="text-muted" style="font-size:10px">Saved</div>
-                  <span class="stat-badge" style="background:#fce4ec;color:#e53935">Your favorites</span>
-                </button>
-              </div>
+          <div class="freshness-track">
+            <div class="freshness-fill"
+              [style.width]="(pantryCount > 0 ? freshnessPercent() : 0) + '%'"
+              [style.background]="freshnessPercent() > 70 ? 'linear-gradient(90deg,#4caf50,#66bb6a)' : freshnessPercent() > 40 ? 'linear-gradient(90deg,#ff9800,#ffb74d)' : 'linear-gradient(90deg,#f44336,#e57373)'">
             </div>
           </div>
+          <div class="d-flex justify-content-between mt-2">
+            <span class="text-muted" style="font-size:10px">{{ freshItemsCount() }} of {{ pantryCount }} items are fresh</span>
+            <span style="font-size:10px;font-weight:600"
+              [style.color]="freshnessPercent() === 100 ? '#2e7d32' : freshnessPercent() > 70 ? '#2e7d32' : '#f57c00'">
+              {{ pantryCount === 0 ? '— Add items' : freshnessPercent() === 100 ? '🌿 Perfect!' : freshnessPercent() > 70 ? '✓ Healthy' : '⚠ Needs attention' }}
+            </span>
+          </div>
+        </div>
+      </div>
 
+      <!-- Expiring Soon + Recently Added (two columns) -->
+      <div class="row g-3 mb-3">
+        <!-- Expiring Soon -->
+        <div class="col-12 col-md-6">
+          <div class="card border-0 shadow-sm h-100" style="border-radius:14px">
+            <div class="card-body p-3">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="fw-bold d-flex align-items-center gap-2" style="font-size:13px;color:#1a2a1a">
+                  <div class="ps-section-icon" style="background:#fff3e0">
+                    <mat-icon style="color:#f57c00;font-size:15px;width:15px;height:15px">schedule</mat-icon>
+                  </div>
+                  Items Expiring Soon
+                </div>
+                <button class="btn btn-link p-0 fw-semibold text-decoration-none" style="font-size:11px;color:#f57c00" (click)="goToPantry()">
+                  View all →
+                </button>
+              </div>
+
+              @if (expiringSoonItems().length === 0) {
+                <div class="text-center py-3">
+                  <div style="font-size:36px;margin-bottom:6px">✅</div>
+                  <div class="fw-semibold" style="font-size:13px;color:#2e7d32">All clear!</div>
+                  <div class="text-muted" style="font-size:11px;margin-top:2px">No items expiring in the next 7 days.</div>
+                </div>
+              } @else {
+                <div class="d-flex flex-column gap-2">
+                  @for (item of expiringSoonItems().slice(0,4); track item.id) {
+                    <div class="d-flex align-items-center gap-2 p-2 rounded-3"
+                      style="background:#fff8f0;border:1px solid #ffe0b2">
+                      <div style="font-size:20px;flex-shrink:0">{{ catEmoji(item.category) }}</div>
+                      <div class="flex-fill overflow-hidden">
+                        <div class="fw-semibold text-truncate" style="font-size:12px;color:#1a2a1a">{{ item.ingredient_name }}</div>
+                        <div style="font-size:10px;color:#f57c00;font-weight:600">{{ daysLeftLabel(item.expiry_date) }}</div>
+                      </div>
+                      @if (item.quantity) {
+                        <span class="text-muted flex-shrink-0" style="font-size:10px">{{ item.quantity }}{{ item.unit ? ' ' + item.unit : '' }}</span>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Recently Added -->
+        <div class="col-12 col-md-6">
+          <div class="card border-0 shadow-sm h-100" style="border-radius:14px">
+            <div class="card-body p-3">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="fw-bold d-flex align-items-center gap-2" style="font-size:13px;color:#1a2a1a">
+                  <div class="ps-section-icon" style="background:#e8f5e9">
+                    <mat-icon style="color:#2e7d32;font-size:15px;width:15px;height:15px">add_circle</mat-icon>
+                  </div>
+                  Recently Added
+                </div>
+                <button class="btn btn-link p-0 fw-semibold text-decoration-none" style="font-size:11px;color:#2e7d32" (click)="goToPantry()">
+                  View all →
+                </button>
+              </div>
+
+              @if (recentlyAddedItems().length === 0) {
+                <div class="text-center py-3">
+                  <div style="font-size:36px;margin-bottom:6px">🥦</div>
+                  <div class="fw-semibold" style="font-size:13px;color:#1a2a1a">Pantry is empty</div>
+                  <div class="text-muted" style="font-size:11px;margin-top:2px">Add your first ingredient to get started.</div>
+                  <button class="btn btn-sm fw-semibold mt-2"
+                    style="background:#2e7d32;color:#fff;border-radius:8px;font-size:11px;border:none"
+                    (click)="goToPantry()">+ Add Ingredients</button>
+                </div>
+              } @else {
+                <div class="d-flex flex-column gap-2">
+                  @for (item of recentlyAddedItems(); track item.id) {
+                    <div class="d-flex align-items-center gap-2 p-2 rounded-3"
+                      style="background:#f8fdf8;border:1px solid #e8f5e9">
+                      <div style="width:34px;height:34px;border-radius:8px;background:#e8f5e9;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">
+                        {{ catEmoji(item.category) }}
+                      </div>
+                      <div class="flex-fill overflow-hidden">
+                        <div class="fw-semibold text-truncate" style="font-size:12px;color:#1a2a1a">{{ item.ingredient_name }}</div>
+                        <div class="text-muted text-truncate" style="font-size:10px">{{ item.category || 'Uncategorized' }}</div>
+                      </div>
+                      <span class="badge rounded-pill fw-bold flex-shrink-0" style="font-size:9px;background:#e8f5e9;color:#2e7d32">New</span>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pantry Health Insights -->
+      @if (pantryCount > 0) {
+        <div class="card border-0 shadow-sm" style="border-radius:14px;background:linear-gradient(135deg,#f1f8e9 0%,#e8f5e9 100%)">
+          <div class="card-body p-3">
+            <div class="fw-bold mb-2 d-flex align-items-center gap-2" style="font-size:13px;color:#1a2a1a">
+              <mat-icon style="font-size:18px;width:18px;height:18px;color:#2e7d32">insights</mat-icon>
+              Pantry Health Insights
+            </div>
+            <div class="d-flex flex-column gap-2">
+              @if (expiringSoonCount() > 0) {
+                <div class="insight-row" style="background:rgba(255,152,0,0.1)">
+                  <mat-icon style="font-size:15px;width:15px;height:15px;color:#f57c00;flex-shrink:0">warning_amber</mat-icon>
+                  <span>{{ expiringSoonCount() }} item{{ expiringSoonCount() > 1 ? 's' : '' }} expiring within 7 days — cook these first to avoid waste!</span>
+                </div>
+              }
+              @if (lowStockCount() > 0) {
+                <div class="insight-row" style="background:rgba(21,101,192,0.08)">
+                  <mat-icon style="font-size:15px;width:15px;height:15px;color:#1565c0;flex-shrink:0">info</mat-icon>
+                  <span>{{ lowStockCount() }} item{{ lowStockCount() > 1 ? 's' : '' }} running low — consider restocking soon.</span>
+                </div>
+              }
+              @if (recipeCount > 0) {
+                <div class="insight-row" style="background:rgba(46,125,50,0.08)">
+                  <mat-icon style="font-size:15px;width:15px;height:15px;color:#2e7d32;flex-shrink:0">restaurant</mat-icon>
+                  <span>{{ recipeCount }} recipe{{ recipeCount > 1 ? 's' : '' }} match your pantry — <button class="btn btn-link p-0 fw-semibold" style="font-size:12px;color:#2e7d32;vertical-align:baseline;text-decoration:underline" (click)="goToPantryRecipes()">see suggestions</button>.</span>
+                </div>
+              }
+              @if (expiringSoonCount() === 0 && lowStockCount() === 0) {
+                <div class="insight-row" style="background:rgba(46,125,50,0.08)">
+                  <mat-icon style="font-size:15px;width:15px;height:15px;color:#2e7d32;flex-shrink:0">thumb_up</mat-icon>
+                  <span>Your pantry is in great shape — no expiring or low-stock items!</span>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+
+    </div>
+  } @else {
+    <!-- Not logged in: CTA card -->
+    <div class="px-3 px-md-4 mt-4">
+      <div class="card border-0 shadow-sm" style="border-radius:16px;background:linear-gradient(135deg,#f1f8e9,#e8f5e9)">
+        <div class="card-body p-4 text-center">
+          <div style="font-size:48px;margin-bottom:8px">🥗</div>
+          <h3 class="fw-bold mb-1" style="font-size:18px;color:#1a2a1a">Track Your Pantry</h3>
+          <p class="text-muted small mb-3 mx-auto" style="max-width:280px">Sign in to manage your ingredients, get expiry alerts, and discover recipes from what you have.</p>
+          <a class="btn fw-bold px-4 py-2" routerLink="/auth/login"
+            style="background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border-radius:12px;font-size:14px;border:none">
+            Get Started Free →
+          </a>
         </div>
       </div>
     </div>
-  </div>
+  }
 
   <!-- ── S3: Mode cards ───────────────────────────────────── -->
   <div class="px-3 px-md-4 mt-4">
@@ -333,11 +505,11 @@ function getGreeting(): string {
     </div>
   </div>
 
-  <!-- ── S5: Recommended Recipes ──────────────────────────── -->
+  <!-- ── S5: Best Recipes From Your Pantry ───────────────── -->
   <div class="px-3 px-md-4 mt-4">
     <div class="d-flex align-items-center justify-content-between mb-1">
       <h2 class="section-title mb-0 d-flex align-items-center gap-2">
-        {{ auth.isLoggedIn() ? 'From Your Pantry' : 'Recommended for You' }}
+        {{ auth.isLoggedIn() ? 'Best Recipes From Your Pantry' : 'Recommended for You' }}
         <mat-icon style="font-size:16px;width:16px;height:16px;color:#4caf50">eco</mat-icon>
       </h2>
       <a class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold d-flex align-items-center gap-1" style="color:#2e7d32" routerLink="/recommendations">
@@ -456,48 +628,41 @@ function getGreeting(): string {
   <div class="px-3 px-md-4 mt-3 pb-5">
     <div class="row g-3">
 
-      <!-- Pantry Summary card -->
+      <!-- Quick Pantry Actions card -->
       <div class="col-6">
-        <div class="bottom-card position-relative overflow-hidden" style="background:#eef7ee;border-radius:18px;min-height:200px">
+        <div class="bottom-card position-relative overflow-hidden" style="background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border-radius:18px;min-height:200px">
           <div class="p-3" style="position:relative;z-index:1">
-            <div class="d-flex align-items-center gap-2 mb-1">
+            <div class="d-flex align-items-center gap-2 mb-2">
               <div style="width:32px;height:32px;border-radius:8px;background:rgba(46,125,50,0.15);display:flex;align-items:center;justify-content:center">
                 <mat-icon style="font-size:18px;width:18px;height:18px;color:#2e7d32">kitchen</mat-icon>
               </div>
-              <span class="fw-bold" style="font-size:13px;color:#1a2a1a">Your Pantry Summary</span>
-              <mat-icon class="ms-auto" style="font-size:18px;color:#2e7d32;cursor:pointer" routerLink="/pantry">chevron_right</mat-icon>
+              <span class="fw-bold" style="font-size:13px;color:#1a2a1a">My Pantry</span>
             </div>
-            <p class="text-muted mb-3" style="font-size:11px;line-height:1.4">See what's in stock and plan smarter meals.</p>
-            <div class="d-flex align-items-center gap-3">
-              <!-- Mini circular health ring -->
-              <div class="pantry-ring-wrap flex-shrink-0">
-                <svg width="64" height="64" viewBox="0 0 64 64">
-                  <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(46,125,50,0.18)" stroke-width="5"/>
-                  <circle cx="32" cy="32" r="26" fill="none" stroke="#2e7d32" stroke-width="5"
-                    stroke-linecap="round"
-                    [attr.stroke-dasharray]="163.4"
-                    [attr.stroke-dashoffset]="163.4 * (1 - (pantryCount > 0 ? Math.min(pantryCount / 20, 1) : 0))"
-                    transform="rotate(-90 32 32)"
-                    style="transition:stroke-dashoffset 0.8s ease"/>
-                </svg>
-                <div class="pantry-ring-pct">{{ pantryCount > 0 ? Math.min(Math.round(pantryCount / 20 * 100), 100) : 0 }}%</div>
+            <div class="d-flex flex-column gap-1 mb-3">
+              <div class="d-flex align-items-center gap-2">
+                <span class="fw-bold" style="font-size:22px;color:#2e7d32">{{ pantryCount }}</span>
+                <span class="text-muted" style="font-size:11px">items tracked</span>
               </div>
-              <div>
-                <div class="fw-bold" style="font-size:13px;color:#1a2a1a">Pantry Health</div>
-                <div style="font-size:11px;color:#2e7d32" class="fw-semibold">
-                  {{ pantryCount > 10 ? "You're doing great!" : pantryCount > 0 ? 'Keep adding items' : 'Add items to start' }}
+              @if (expiringSoonCount() > 0) {
+                <div class="d-flex align-items-center gap-1" style="font-size:11px;color:#f57c00">
+                  <mat-icon style="font-size:13px;width:13px;height:13px">schedule</mat-icon>
+                  {{ expiringSoonCount() }} expiring soon
                 </div>
-                <div class="text-muted" style="font-size:10px">{{ pantryCount }} items tracked</div>
-              </div>
+              }
+              @if (recipeCount > 0) {
+                <div class="d-flex align-items-center gap-1" style="font-size:11px;color:#6a1b9a">
+                  <mat-icon style="font-size:13px;width:13px;height:13px">dinner_dining</mat-icon>
+                  {{ recipeCount }} recipe matches
+                </div>
+              }
             </div>
-            <button class="btn fw-semibold mt-3 d-flex align-items-center gap-1"
+            <button class="btn fw-semibold d-flex align-items-center gap-1"
               style="background:#2e7d32;color:#fff;border-radius:22px;font-size:12px;padding:8px 16px;border:none"
               routerLink="/pantry">
               <mat-icon style="font-size:14px;width:14px;height:14px">kitchen</mat-icon>
               View Pantry
             </button>
           </div>
-          <!-- Pantry image -->
           <img src="https://images.unsplash.com/photo-1584568694244-14fbdf83bd30?w=300&auto=format&fit=crop&q=80"
                class="bottom-card-img" alt="Pantry">
         </div>
@@ -521,7 +686,6 @@ function getGreeting(): string {
               Learn More
             </button>
           </div>
-          <!-- Lemon water image -->
           <img src="https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=300&auto=format&fit=crop&q=80"
                class="bottom-card-img" alt="Healthy drink">
         </div>
@@ -633,7 +797,6 @@ function getGreeting(): string {
     </div>
   }
 
-
 </div>
   `,
   styles: [`
@@ -656,65 +819,51 @@ function getGreeting(): string {
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
 
-    /* Notification bell */
-    .notif-btn { background: transparent !important; line-height: 1; }
-    .notif-badge {
-      position: absolute; top: -4px; right: -6px;
-      background: #ff5252; color: #fff; font-size: 9px; font-weight: 700;
-      border-radius: 10px; padding: 1px 5px; line-height: 1.4;
+    /* ── Pantry Summary ─────────────────────────────────── */
+    .ps-stat-card {
+      border-radius: 14px;
+      border: 1.5px solid #e8f0e8;
+      padding: 14px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      transition: transform 0.15s, box-shadow 0.15s;
     }
-
-    /* User avatar */
-    .user-avatar {
-      width: 36px; height: 36px; border-radius: 50%;
-      background: rgba(255,255,255,0.22); color: #fff;
-      font-weight: 700; font-size: 15px;
+    .ps-stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.08); }
+    .ps-stat-icon {
+      width: 32px; height: 32px; border-radius: 8px;
       display: flex; align-items: center; justify-content: center;
-      border: 2px solid rgba(255,255,255,0.4);
+      margin-bottom: 6px; flex-shrink: 0;
+    }
+    .ps-pill {
+      display: inline-block; font-size: 9px; font-weight: 700;
+      padding: 2px 8px; border-radius: 20px; white-space: nowrap; width: fit-content;
+    }
+    .ps-section-icon {
+      width: 26px; height: 26px; border-radius: 7px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
 
-    /* Circular score ring */
-    .score-ring-wrap {
-      position: relative; width: 88px; height: 88px; flex-shrink: 0;
+    /* Freshness bar */
+    .freshness-track {
+      height: 8px; background: #e8e8e8; border-radius: 4px; overflow: hidden;
     }
-    .score-ring-inner {
-      position: absolute; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-    }
-
-    /* Score text */
-    .score-text { min-width: 130px; }
-
-    /* Stat button */
-    .stat-btn {
-      border-radius: 10px; transition: background 0.15s, transform 0.12s; cursor: pointer;
-      &:hover { background: #f1f8e9 !important; }
-      &:active { transform: scale(0.94); }
+    .freshness-fill {
+      height: 100%; border-radius: 4px;
+      transition: width 0.8s ease, background 0.3s ease;
+      min-width: 2px;
     }
 
-    /* Stat icon wrap */
-    .stat-icon-wrap {
-      width: 32px; height: 32px; border-radius: 8px; background: #f1f8e9;
-      display: flex; align-items: center; justify-content: center;
-    }
-
-    /* Stat badge */
-    .stat-badge {
-      display: inline-block; font-size: 9px; font-weight: 600;
-      padding: 2px 6px; border-radius: 20px; margin-top: 3px;
-      white-space: nowrap;
+    /* Insight rows */
+    .insight-row {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 8px 10px; border-radius: 8px;
+      font-size: 12px; color: #1a2a1a; line-height: 1.4;
     }
 
     /* Mode card */
     .mode-card { transition: transform 0.15s, box-shadow 0.15s; }
     .mode-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1) !important; }
-
-    /* Mood chips */
-    .mood-chip {
-      border: 2px solid #e8f0e8; background: #fff; color: #1a2a1a;
-      font-size: 13px; padding: 8px 14px; white-space: nowrap; transition: all 0.15s;
-    }
-    .mood-chip.mood-active { border-color: #2e7d32; background: #f1f8e9; color: #2e7d32; font-weight: 600; }
 
     /* Recipe cards */
     .recipe-card { transition: transform 0.15s; }
@@ -723,12 +872,6 @@ function getGreeting(): string {
     /* Heart button */
     .heart-btn mat-icon { color: #bdbdbd; transition: color 0.15s; }
     .heart-btn.liked mat-icon { color: #e53935; }
-
-    /* AI avatar */
-    .ai-avatar-sm {
-      width: 32px; height: 32px; border-radius: 50%; background: #2e7d32;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-    }
 
     /* Recipe grid on desktop */
     @media (min-width: 768px) {
@@ -805,7 +948,6 @@ function getGreeting(): string {
       transition: background 0.15s;
       &:hover { background: #e8f5e9; }
     }
-    /* Dot indicators */
     .hero-dots {
       position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
       display: flex; gap: 6px; z-index: 2;
@@ -823,9 +965,6 @@ function getGreeting(): string {
       .hero-overlay { padding: 28px 36px; }
       .hero-sub { max-width: 280px; }
     }
-
-    /* Stat icon */
-    .stat-icon { font-size: 16px; width: 16px; height: 16px; color: #4caf50; display: block; }
 
     /* Mode card image */
     .mode-img-wrap {
@@ -879,18 +1018,8 @@ function getGreeting(): string {
     .bottom-card-img {
       position: absolute; bottom: 0; right: 0;
       width: 110px; height: 110px; object-fit: cover;
-      opacity: 0.28; border-radius: 0 0 18px 0;
+      opacity: 0.25; border-radius: 0 0 18px 0;
       pointer-events: none;
-    }
-
-    /* Pantry mini ring */
-    .pantry-ring-wrap {
-      position: relative; width: 64px; height: 64px; flex-shrink: 0;
-    }
-    .pantry-ring-pct {
-      position: absolute; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 12px; font-weight: 700; color: #2e7d32;
     }
   `],
 })
@@ -899,8 +1028,6 @@ export class HomeComponent implements OnInit, OnDestroy {
   auth    = inject(AuthService);
   favSvc  = inject(FavoritesService);
   private http = inject(HttpClient);
-
-  readonly Math = Math;
 
   greeting    = getGreeting();
   imgFallback = IMG_FALLBACK;
@@ -919,10 +1046,46 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   recipeCount = 0;
   pantryCount = 0;
-  activeDays  = 0;
-  healthScore = 0;
 
-  // Derived from the shared service so heart state is in sync across pages
+  private pantryItemsList = signal<PantryItemLocal[]>([]);
+
+  expiringSoonItems = computed(() =>
+    this.pantryItemsList().filter(i => {
+      if (!i.expiry_date) return false;
+      const d = this.daysLeftNum(i.expiry_date);
+      return d >= 0 && d <= 7;
+    })
+  );
+
+  recentlyAddedItems = computed(() =>
+    [...this.pantryItemsList()]
+      .sort((a, b) => new Date(b.added_at).getTime() - new Date(a.added_at).getTime())
+      .slice(0, 4)
+  );
+
+  expiringSoonCount = computed(() => this.expiringSoonItems().length);
+
+  lowStockCount = computed(() =>
+    this.pantryItemsList().filter(i => {
+      if (!i.quantity) return false;
+      const n = parseFloat(i.quantity);
+      return !isNaN(n) && n <= 1;
+    }).length
+  );
+
+  freshItemsCount = computed(() =>
+    this.pantryItemsList().filter(i => {
+      if (!i.expiry_date) return true;
+      return this.daysLeftNum(i.expiry_date) >= 0;
+    }).length
+  );
+
+  freshnessPercent = computed(() => {
+    const total = this.pantryItemsList().length;
+    if (!total) return 0;
+    return Math.round((this.freshItemsCount() / total) * 100);
+  });
+
   favouriteIds   = this.favSvc.favouriteIds;
   favouriteCards = computed(() => this.favSvc.favouriteRecipes().map(r => recipeToCard(r)));
   private rawDiscoveryRecipes = signal<ApiRecipe[]>([]);
@@ -941,7 +1104,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (this.auth.isLoggedIn()) {
       this.loadPantryRecipes();
       this.loadPantry();
-      this.loadInsights();
       this.favSvc.load();
     } else {
       this.loadRecipes();
@@ -987,18 +1149,11 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   private loadPantry() {
-    this.http.get<unknown[]>(`${environment.apiUrl}/pantry`)
+    this.http.get<PantryItemLocal[]>(`${environment.apiUrl}/pantry`)
       .pipe(catchError(() => of([])))
-      .subscribe(items => { this.pantryCount = items.length; });
-  }
-
-  private loadInsights() {
-    this.http.get<{ health_score: number | null; active_days: number }>(`${environment.apiUrl}/insights`)
-      .pipe(catchError(() => of(null)))
-      .subscribe(data => {
-        if (!data) return;
-        if (data.health_score !== null) this.healthScore = data.health_score;
-        this.activeDays = data.active_days;
+      .subscribe(items => {
+        this.pantryItemsList.set(items);
+        this.pantryCount = items.length;
       });
   }
 
@@ -1027,9 +1182,28 @@ export class HomeComponent implements OnInit, OnDestroy {
     return instructions.split(/\n+|\d+\.\s+/).map(s => s.trim()).filter(Boolean);
   }
 
+  daysLeftNum(expiryDate: string | null): number {
+    if (!expiryDate) return Infinity;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const exp = new Date(expiryDate + 'T00:00:00');
+    return Math.ceil((exp.getTime() - today.getTime()) / 86_400_000);
+  }
+
+  daysLeftLabel(expiryDate: string | null): string {
+    const d = this.daysLeftNum(expiryDate);
+    if (!isFinite(d)) return '';
+    if (d < 0) return `Expired ${Math.abs(d)}d ago`;
+    if (d === 0) return 'Expires today!';
+    if (d === 1) return '1 day left';
+    return `${d} days left`;
+  }
+
+  catEmoji(cat: string | null): string {
+    return CAT_EMOJI_MAP[cat ?? ''] ?? '🥘';
+  }
+
   goToPantry()       { this.router.navigate(['/pantry']); }
   goToPantryRecipes(){ this.router.navigate(['/recommendations'], { queryParams: { mode: 'pantry' } }); }
-  goToInsights()     { this.router.navigate(['/insights']); }
   goToFavourites() {
     if (!this.auth.isLoggedIn()) return;
     setTimeout(() =>
@@ -1042,6 +1216,5 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (mode === 'plan') { this.router.navigate(['/meal-planner']); return; }
     this.router.navigate(['/recommendations'], { queryParams: { mode } });
   }
-  goMoodSuggestions()      { this.router.navigate(['/recommendations'], { queryParams: { mood: this.selectedMood() } }); }
-
+  goMoodSuggestions() { this.router.navigate(['/recommendations'], { queryParams: { mood: this.selectedMood() } }); }
 }
