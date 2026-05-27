@@ -16,8 +16,6 @@ interface ModeCard   { key: string; emoji: string; title: string; subtitle: stri
 interface RecipeCard { id: string; title: string; emoji: string; cardBg: string; matchPct: number; matchBg: string; time: string; difficulty: string; chip: string; chipBg: string; imageUrl: string; }
 interface RecipeIngredientDetail { ingredient: { id: string; name: string; category: string | null }; quantity: string | null; unit: string | null; notes: string | null; is_optional: boolean; }
 interface RecipeDetail { id: string; title: string; description: string | null; instructions: string | null; prep_time_minutes: number | null; cook_time_minutes: number | null; servings: number; cuisine_type: string | null; meal_type: string | null; ailment_tags: string[]; health_benefits: string[]; dietary_labels: string[]; efficacy_score: number; recipe_ingredients: RecipeIngredientDetail[]; }
-interface PantryItemLocal { id: string; ingredient_name: string; quantity: string | null; unit: string | null; category: string | null; expiry_date: string | null; storage_tips: string | null; added_at: string; }
-
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const HERO_SLIDES: HeroSlide[] = [
@@ -66,12 +64,6 @@ const MEAL_ICON: Record<string, string> = { breakfast: 'free_breakfast', lunch: 
 const IMG_FALLBACK = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=300&auto=format&fit=crop&q=80';
 const IMG_STOP = new Set(['a','an','the','with','and','or','of','in','on','for','to','my','your','our','its','from','made','style','easy','quick','healthy','organic','fresh']);
 
-const CAT_EMOJI_MAP: Record<string, string> = {
-  'Leafy Greens': '🥬', 'Vegetables': '🥦', 'Fruits': '🍎', 'Berries': '🫐',
-  'Nuts & Seeds': '🌰', 'Grains': '🌾',    'Legumes': '🫘', 'Fish & Seafood': '🐟',
-  'Meat & Poultry': '🍗', 'Dairy': '🥛',  'Herbs & Spices': '🌿', 'Oils': '🫙',
-  'Sweeteners': '🍯', 'Adaptogens': '🍵',
-};
 
 function titleToImageUrl(title: string, mealType: string | null): string {
   const words = title.toLowerCase()
@@ -169,266 +161,6 @@ function getGreeting(): string {
       }
     </div>
   </div>
-
-  <!-- ── S2: Pantry Summary ─────────────────────────────── -->
-  @if (auth.isLoggedIn()) {
-    <div class="px-3 px-md-4 mt-4">
-
-      <!-- Section header -->
-      <div class="d-flex align-items-center justify-content-between mb-3">
-        <div>
-          <h2 class="section-title mb-0 d-flex align-items-center gap-2">
-            <mat-icon style="font-size:20px;width:20px;height:20px;color:#2e7d32">kitchen</mat-icon>
-            Your Pantry Summary
-          </h2>
-          <p class="text-muted mb-0 mt-1" style="font-size:12px">
-            {{ pantryCount }} ingredient{{ pantryCount !== 1 ? 's' : '' }} tracked
-          </p>
-        </div>
-        <button class="btn fw-semibold d-flex align-items-center gap-1"
-          style="background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border-radius:10px;font-size:12px;padding:8px 16px;border:none;box-shadow:0 2px 8px rgba(46,125,50,.25)"
-          (click)="goToPantry()">
-          <mat-icon style="font-size:15px;width:15px;height:15px">kitchen</mat-icon>
-          Manage Pantry
-        </button>
-      </div>
-
-      <!-- 4 Stat cards -->
-      <div class="row g-2 mb-3">
-        <div class="col-6 col-sm-3">
-          <div class="ps-stat-card" style="background:#f8fdf8;border-color:#c8e6c9">
-            <div class="ps-stat-icon" style="background:#e8f5e9">
-              <mat-icon style="color:#2e7d32;font-size:18px;width:18px;height:18px">kitchen</mat-icon>
-            </div>
-            <div class="fw-bold" style="font-size:26px;color:#1a2a1a;line-height:1.1">{{ pantryCount }}</div>
-            <div class="text-muted" style="font-size:11px;margin:3px 0">Total Items</div>
-            <span class="ps-pill"
-              [style.background]="pantryCount > 10 ? '#e8f5e9' : pantryCount > 0 ? '#fff3e0' : '#f5f5f5'"
-              [style.color]="pantryCount > 10 ? '#2e7d32' : pantryCount > 0 ? '#f57c00' : '#9e9e9e'">
-              {{ pantryCount > 10 ? 'Well stocked' : pantryCount > 0 ? 'Building up' : 'Empty' }}
-            </span>
-          </div>
-        </div>
-        <div class="col-6 col-sm-3">
-          <div class="ps-stat-card" style="background:#fff8f0;border-color:#ffcc80;cursor:pointer" (click)="goToPantry()">
-            <div class="ps-stat-icon" style="background:#fff3e0">
-              <mat-icon style="color:#f57c00;font-size:18px;width:18px;height:18px">schedule</mat-icon>
-            </div>
-            <div class="fw-bold" style="font-size:26px;color:#e65100;line-height:1.1">{{ expiringSoonCount() }}</div>
-            <div class="text-muted" style="font-size:11px;margin:3px 0">Expiring Soon</div>
-            <span class="ps-pill"
-              [style.background]="expiringSoonCount() > 0 ? '#fff3e0' : '#e8f5e9'"
-              [style.color]="expiringSoonCount() > 0 ? '#f57c00' : '#2e7d32'">
-              {{ expiringSoonCount() > 0 ? 'Act now!' : 'All fresh!' }}
-            </span>
-          </div>
-        </div>
-        <div class="col-6 col-sm-3">
-          <div class="ps-stat-card" style="background:#f0f4ff;border-color:#9fa8da;cursor:pointer" (click)="goToPantry()">
-            <div class="ps-stat-icon" style="background:#e3f2fd">
-              <mat-icon style="color:#1565c0;font-size:18px;width:18px;height:18px">inventory_2</mat-icon>
-            </div>
-            <div class="fw-bold" style="font-size:26px;color:#1565c0;line-height:1.1">{{ lowStockCount() }}</div>
-            <div class="text-muted" style="font-size:11px;margin:3px 0">Low Stock</div>
-            <span class="ps-pill"
-              [style.background]="lowStockCount() > 0 ? '#e3f2fd' : '#e8f5e9'"
-              [style.color]="lowStockCount() > 0 ? '#1565c0' : '#2e7d32'">
-              {{ lowStockCount() > 0 ? 'Restock' : 'Good stock' }}
-            </span>
-          </div>
-        </div>
-        <div class="col-6 col-sm-3">
-          <div class="ps-stat-card" style="background:#fdf5ff;border-color:#ce93d8;cursor:pointer" (click)="goToPantryRecipes()">
-            <div class="ps-stat-icon" style="background:#f3e5f5">
-              <mat-icon style="color:#6a1b9a;font-size:18px;width:18px;height:18px">dinner_dining</mat-icon>
-            </div>
-            <div class="fw-bold" style="font-size:26px;color:#6a1b9a;line-height:1.1">{{ recipeCount }}</div>
-            <div class="text-muted" style="font-size:11px;margin:3px 0">Recipe Matches</div>
-            <span class="ps-pill"
-              [style.background]="recipeCount > 0 ? '#f3e5f5' : '#f5f5f5'"
-              [style.color]="recipeCount > 0 ? '#6a1b9a' : '#9e9e9e'">
-              {{ recipeCount > 0 ? 'Cook now!' : 'Add items' }}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Freshness bar -->
-      <div class="card border-0 shadow-sm mb-3" style="border-radius:14px">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <div class="fw-semibold d-flex align-items-center gap-2" style="font-size:13px;color:#1a2a1a">
-              <mat-icon style="font-size:16px;width:16px;height:16px;color:#4caf50">eco</mat-icon>
-              Pantry Freshness
-            </div>
-            <div class="fw-bold" style="font-size:16px"
-              [style.color]="freshnessPercent() > 70 ? '#2e7d32' : freshnessPercent() > 40 ? '#f57c00' : '#c62828'">
-              {{ freshnessPercent() }}%
-            </div>
-          </div>
-          <div class="freshness-track">
-            <div class="freshness-fill"
-              [style.width]="(pantryCount > 0 ? freshnessPercent() : 0) + '%'"
-              [style.background]="freshnessPercent() > 70 ? 'linear-gradient(90deg,#4caf50,#66bb6a)' : freshnessPercent() > 40 ? 'linear-gradient(90deg,#ff9800,#ffb74d)' : 'linear-gradient(90deg,#f44336,#e57373)'">
-            </div>
-          </div>
-          <div class="d-flex justify-content-between mt-2">
-            <span class="text-muted" style="font-size:10px">{{ freshItemsCount() }} of {{ pantryCount }} items are fresh</span>
-            <span style="font-size:10px;font-weight:600"
-              [style.color]="freshnessPercent() === 100 ? '#2e7d32' : freshnessPercent() > 70 ? '#2e7d32' : '#f57c00'">
-              {{ pantryCount === 0 ? '— Add items' : freshnessPercent() === 100 ? '🌿 Perfect!' : freshnessPercent() > 70 ? '✓ Healthy' : '⚠ Needs attention' }}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Expiring Soon + Recently Added (two columns) -->
-      <div class="row g-3 mb-3">
-        <!-- Expiring Soon -->
-        <div class="col-12 col-md-6">
-          <div class="card border-0 shadow-sm h-100" style="border-radius:14px">
-            <div class="card-body p-3">
-              <div class="d-flex align-items-center justify-content-between mb-3">
-                <div class="fw-bold d-flex align-items-center gap-2" style="font-size:13px;color:#1a2a1a">
-                  <div class="ps-section-icon" style="background:#fff3e0">
-                    <mat-icon style="color:#f57c00;font-size:15px;width:15px;height:15px">schedule</mat-icon>
-                  </div>
-                  Items Expiring Soon
-                </div>
-                <button class="btn btn-link p-0 fw-semibold text-decoration-none" style="font-size:11px;color:#f57c00" (click)="goToPantry()">
-                  View all →
-                </button>
-              </div>
-
-              @if (expiringSoonItems().length === 0) {
-                <div class="text-center py-3">
-                  <div style="font-size:36px;margin-bottom:6px">✅</div>
-                  <div class="fw-semibold" style="font-size:13px;color:#2e7d32">All clear!</div>
-                  <div class="text-muted" style="font-size:11px;margin-top:2px">No items expiring in the next 7 days.</div>
-                </div>
-              } @else {
-                <div class="d-flex flex-column gap-2">
-                  @for (item of expiringSoonItems().slice(0,4); track item.id) {
-                    <div class="d-flex align-items-center gap-2 p-2 rounded-3"
-                      style="background:#fff8f0;border:1px solid #ffe0b2">
-                      <div style="font-size:20px;flex-shrink:0">{{ catEmoji(item.category) }}</div>
-                      <div class="flex-fill overflow-hidden">
-                        <div class="fw-semibold text-truncate" style="font-size:12px;color:#1a2a1a">{{ item.ingredient_name }}</div>
-                        <div style="font-size:10px;color:#f57c00;font-weight:600">{{ daysLeftLabel(item.expiry_date) }}</div>
-                      </div>
-                      @if (item.quantity) {
-                        <span class="text-muted flex-shrink-0" style="font-size:10px">{{ item.quantity }}{{ item.unit ? ' ' + item.unit : '' }}</span>
-                      }
-                    </div>
-                  }
-                </div>
-              }
-            </div>
-          </div>
-        </div>
-
-        <!-- Recently Added -->
-        <div class="col-12 col-md-6">
-          <div class="card border-0 shadow-sm h-100" style="border-radius:14px">
-            <div class="card-body p-3">
-              <div class="d-flex align-items-center justify-content-between mb-3">
-                <div class="fw-bold d-flex align-items-center gap-2" style="font-size:13px;color:#1a2a1a">
-                  <div class="ps-section-icon" style="background:#e8f5e9">
-                    <mat-icon style="color:#2e7d32;font-size:15px;width:15px;height:15px">add_circle</mat-icon>
-                  </div>
-                  Recently Added
-                </div>
-                <button class="btn btn-link p-0 fw-semibold text-decoration-none" style="font-size:11px;color:#2e7d32" (click)="goToPantry()">
-                  View all →
-                </button>
-              </div>
-
-              @if (recentlyAddedItems().length === 0) {
-                <div class="text-center py-3">
-                  <div style="font-size:36px;margin-bottom:6px">🥦</div>
-                  <div class="fw-semibold" style="font-size:13px;color:#1a2a1a">Pantry is empty</div>
-                  <div class="text-muted" style="font-size:11px;margin-top:2px">Add your first ingredient to get started.</div>
-                  <button class="btn btn-sm fw-semibold mt-2"
-                    style="background:#2e7d32;color:#fff;border-radius:8px;font-size:11px;border:none"
-                    (click)="goToPantry()">+ Add Ingredients</button>
-                </div>
-              } @else {
-                <div class="d-flex flex-column gap-2">
-                  @for (item of recentlyAddedItems(); track item.id) {
-                    <div class="d-flex align-items-center gap-2 p-2 rounded-3"
-                      style="background:#f8fdf8;border:1px solid #e8f5e9">
-                      <div style="width:34px;height:34px;border-radius:8px;background:#e8f5e9;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">
-                        {{ catEmoji(item.category) }}
-                      </div>
-                      <div class="flex-fill overflow-hidden">
-                        <div class="fw-semibold text-truncate" style="font-size:12px;color:#1a2a1a">{{ item.ingredient_name }}</div>
-                        <div class="text-muted text-truncate" style="font-size:10px">{{ item.category || 'Uncategorized' }}</div>
-                      </div>
-                      <span class="badge rounded-pill fw-bold flex-shrink-0" style="font-size:9px;background:#e8f5e9;color:#2e7d32">New</span>
-                    </div>
-                  }
-                </div>
-              }
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Pantry Health Insights -->
-      @if (pantryCount > 0) {
-        <div class="card border-0 shadow-sm" style="border-radius:14px;background:linear-gradient(135deg,#f1f8e9 0%,#e8f5e9 100%)">
-          <div class="card-body p-3">
-            <div class="fw-bold mb-2 d-flex align-items-center gap-2" style="font-size:13px;color:#1a2a1a">
-              <mat-icon style="font-size:18px;width:18px;height:18px;color:#2e7d32">insights</mat-icon>
-              Pantry Health Insights
-            </div>
-            <div class="d-flex flex-column gap-2">
-              @if (expiringSoonCount() > 0) {
-                <div class="insight-row" style="background:rgba(255,152,0,0.1)">
-                  <mat-icon style="font-size:15px;width:15px;height:15px;color:#f57c00;flex-shrink:0">warning_amber</mat-icon>
-                  <span>{{ expiringSoonCount() }} item{{ expiringSoonCount() > 1 ? 's' : '' }} expiring within 7 days — cook these first to avoid waste!</span>
-                </div>
-              }
-              @if (lowStockCount() > 0) {
-                <div class="insight-row" style="background:rgba(21,101,192,0.08)">
-                  <mat-icon style="font-size:15px;width:15px;height:15px;color:#1565c0;flex-shrink:0">info</mat-icon>
-                  <span>{{ lowStockCount() }} item{{ lowStockCount() > 1 ? 's' : '' }} running low — consider restocking soon.</span>
-                </div>
-              }
-              @if (recipeCount > 0) {
-                <div class="insight-row" style="background:rgba(46,125,50,0.08)">
-                  <mat-icon style="font-size:15px;width:15px;height:15px;color:#2e7d32;flex-shrink:0">restaurant</mat-icon>
-                  <span>{{ recipeCount }} recipe{{ recipeCount > 1 ? 's' : '' }} match your pantry — <button class="btn btn-link p-0 fw-semibold" style="font-size:12px;color:#2e7d32;vertical-align:baseline;text-decoration:underline" (click)="goToPantryRecipes()">see suggestions</button>.</span>
-                </div>
-              }
-              @if (expiringSoonCount() === 0 && lowStockCount() === 0) {
-                <div class="insight-row" style="background:rgba(46,125,50,0.08)">
-                  <mat-icon style="font-size:15px;width:15px;height:15px;color:#2e7d32;flex-shrink:0">thumb_up</mat-icon>
-                  <span>Your pantry is in great shape — no expiring or low-stock items!</span>
-                </div>
-              }
-            </div>
-          </div>
-        </div>
-      }
-
-    </div>
-  } @else {
-    <!-- Not logged in: CTA card -->
-    <div class="px-3 px-md-4 mt-4">
-      <div class="card border-0 shadow-sm" style="border-radius:16px;background:linear-gradient(135deg,#f1f8e9,#e8f5e9)">
-        <div class="card-body p-4 text-center">
-          <div style="font-size:48px;margin-bottom:8px">🥗</div>
-          <h3 class="fw-bold mb-1" style="font-size:18px;color:#1a2a1a">Track Your Pantry</h3>
-          <p class="text-muted small mb-3 mx-auto" style="max-width:280px">Sign in to manage your ingredients, get expiry alerts, and discover recipes from what you have.</p>
-          <a class="btn fw-bold px-4 py-2" routerLink="/auth/login"
-            style="background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border-radius:12px;font-size:14px;border:none">
-            Get Started Free →
-          </a>
-        </div>
-      </div>
-    </div>
-  }
 
   <!-- ── S3: Mode cards ───────────────────────────────────── -->
   <div class="px-3 px-md-4 mt-4">
@@ -643,12 +375,7 @@ function getGreeting(): string {
                 <span class="fw-bold" style="font-size:22px;color:#2e7d32">{{ pantryCount }}</span>
                 <span class="text-muted" style="font-size:11px">items tracked</span>
               </div>
-              @if (expiringSoonCount() > 0) {
-                <div class="d-flex align-items-center gap-1" style="font-size:11px;color:#f57c00">
-                  <mat-icon style="font-size:13px;width:13px;height:13px">schedule</mat-icon>
-                  {{ expiringSoonCount() }} expiring soon
-                </div>
-              }
+
               @if (recipeCount > 0) {
                 <div class="d-flex align-items-center gap-1" style="font-size:11px;color:#6a1b9a">
                   <mat-icon style="font-size:13px;width:13px;height:13px">dinner_dining</mat-icon>
@@ -1047,45 +774,6 @@ export class HomeComponent implements OnInit, OnDestroy {
   recipeCount = 0;
   pantryCount = 0;
 
-  private pantryItemsList = signal<PantryItemLocal[]>([]);
-
-  expiringSoonItems = computed(() =>
-    this.pantryItemsList().filter(i => {
-      if (!i.expiry_date) return false;
-      const d = this.daysLeftNum(i.expiry_date);
-      return d >= 0 && d <= 7;
-    })
-  );
-
-  recentlyAddedItems = computed(() =>
-    [...this.pantryItemsList()]
-      .sort((a, b) => new Date(b.added_at).getTime() - new Date(a.added_at).getTime())
-      .slice(0, 4)
-  );
-
-  expiringSoonCount = computed(() => this.expiringSoonItems().length);
-
-  lowStockCount = computed(() =>
-    this.pantryItemsList().filter(i => {
-      if (!i.quantity) return false;
-      const n = parseFloat(i.quantity);
-      return !isNaN(n) && n <= 1;
-    }).length
-  );
-
-  freshItemsCount = computed(() =>
-    this.pantryItemsList().filter(i => {
-      if (!i.expiry_date) return true;
-      return this.daysLeftNum(i.expiry_date) >= 0;
-    }).length
-  );
-
-  freshnessPercent = computed(() => {
-    const total = this.pantryItemsList().length;
-    if (!total) return 0;
-    return Math.round((this.freshItemsCount() / total) * 100);
-  });
-
   favouriteIds   = this.favSvc.favouriteIds;
   favouriteCards = computed(() => this.favSvc.favouriteRecipes().map(r => recipeToCard(r)));
   private rawDiscoveryRecipes = signal<ApiRecipe[]>([]);
@@ -1149,12 +837,9 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   private loadPantry() {
-    this.http.get<PantryItemLocal[]>(`${environment.apiUrl}/pantry`)
+    this.http.get<unknown[]>(`${environment.apiUrl}/pantry`)
       .pipe(catchError(() => of([])))
-      .subscribe(items => {
-        this.pantryItemsList.set(items);
-        this.pantryCount = items.length;
-      });
+      .subscribe(items => { this.pantryCount = items.length; });
   }
 
   toggleFavourite(event: Event, recipeId: string) {
@@ -1180,26 +865,6 @@ export class HomeComponent implements OnInit, OnDestroy {
   parseSteps(instructions: string | null): string[] {
     if (!instructions) return [];
     return instructions.split(/\n+|\d+\.\s+/).map(s => s.trim()).filter(Boolean);
-  }
-
-  daysLeftNum(expiryDate: string | null): number {
-    if (!expiryDate) return Infinity;
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const exp = new Date(expiryDate + 'T00:00:00');
-    return Math.ceil((exp.getTime() - today.getTime()) / 86_400_000);
-  }
-
-  daysLeftLabel(expiryDate: string | null): string {
-    const d = this.daysLeftNum(expiryDate);
-    if (!isFinite(d)) return '';
-    if (d < 0) return `Expired ${Math.abs(d)}d ago`;
-    if (d === 0) return 'Expires today!';
-    if (d === 1) return '1 day left';
-    return `${d} days left`;
-  }
-
-  catEmoji(cat: string | null): string {
-    return CAT_EMOJI_MAP[cat ?? ''] ?? '🥘';
   }
 
   goToPantry()       { this.router.navigate(['/pantry']); }
