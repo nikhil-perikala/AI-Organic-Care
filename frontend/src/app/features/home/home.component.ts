@@ -22,14 +22,14 @@ const HERO_SLIDES: HeroSlide[] = [
   {
     imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=1200&auto=format&fit=crop&q=85',
     chip: 'Personalized for you', title: 'Eat Smart, Live Well',
-    sub: 'Personalized recommendations for a healthier you, every day.',
+    sub: 'AI-powered recommendations built around what\'s already in your pantry.',
     btnLabel: 'Explore Recommendations', mode: 'pantry',
   },
   {
     imageUrl: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=1200&auto=format&fit=crop&q=85',
     chip: 'Fresh & Seasonal', title: 'Fresh From Nature',
-    sub: 'Discover seasonal ingredients that nourish your body and mind.',
-    btnLabel: 'Browse Recipes', mode: 'tobuy',
+    sub: 'Browse hundreds of organic recipes curated for your dietary goals.',
+    btnLabel: 'Browse Recipes', mode: 'meals',
   },
   {
     imageUrl: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=1200&auto=format&fit=crop&q=85',
@@ -39,9 +39,9 @@ const HERO_SLIDES: HeroSlide[] = [
   },
   {
     imageUrl: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=1200&auto=format&fit=crop&q=85',
-    chip: 'Boost Your Health', title: 'Heal With Every Bite',
-    sub: 'Organic ingredients chosen to support your wellness journey.',
-    btnLabel: 'See Health Tips', mode: 'pantry',
+    chip: 'AI Wellness Coach', title: 'Heal With Every Bite',
+    sub: 'Ask our AI anything about nutrition, organic living, or your health goals.',
+    btnLabel: 'Ask AI Assistant', mode: 'chat',
   },
 ];
 
@@ -54,9 +54,9 @@ const MOODS: MoodOption[] = [
 ];
 
 const MODE_CARDS: ModeCard[] = [
-  { key: 'pantry', emoji: 'kitchen',         title: 'Pantry Mode',  subtitle: 'Use what you have in your kitchen',  color: '#2e7d32', btnBg: '#2e7d32', imgBg: 'linear-gradient(135deg,#e8f5e9,#a5d6a7)', imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&auto=format&fit=crop&q=80' },
-  { key: 'tobuy',  emoji: 'shopping_cart',   title: 'To-Buy Mode',  subtitle: 'See what to buy & get meal ideas',   color: '#1565c0', btnBg: '#1565c0', imgBg: 'linear-gradient(135deg,#e3f2fd,#90caf9)', imageUrl: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=400&auto=format&fit=crop&q=80' },
-  { key: 'plan',   emoji: 'calendar_month',  title: 'Meal Planner', subtitle: 'Plan your week intelligently',        color: '#6a1b9a', btnBg: '#6a1b9a', imgBg: 'linear-gradient(135deg,#f3e5f5,#ce93d8)', imageUrl: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&auto=format&fit=crop&q=80' },
+  { key: 'pantry-manage', emoji: 'kitchen',        title: 'My Pantry',    subtitle: 'View & manage your ingredients',     color: '#2e7d32', btnBg: '#2e7d32', imgBg: 'linear-gradient(135deg,#e8f5e9,#a5d6a7)', imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&auto=format&fit=crop&q=80' },
+  { key: 'tobuy',         emoji: 'shopping_cart',  title: 'Shopping List', subtitle: 'Build & discover what to buy next', color: '#1565c0', btnBg: '#1565c0', imgBg: 'linear-gradient(135deg,#e3f2fd,#90caf9)', imageUrl: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=400&auto=format&fit=crop&q=80' },
+  { key: 'plan',          emoji: 'calendar_month', title: 'Meal Planner',  subtitle: 'Plan your week intelligently',       color: '#6a1b9a', btnBg: '#6a1b9a', imgBg: 'linear-gradient(135deg,#f3e5f5,#ce93d8)', imageUrl: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&auto=format&fit=crop&q=80' },
 ];
 
 const MEAL_ICON: Record<string, string> = { breakfast: 'free_breakfast', lunch: 'lunch_dining', dinner: 'dinner_dining', beverage: 'local_cafe', snack: 'apple' };
@@ -103,6 +103,33 @@ function recipeToCard(r: ApiRecipe): RecipeCard {
     chipBg:     theme.chipBg,
     imageUrl:   titleToImageUrl(r.title, r.meal_type),
   };
+}
+
+const DAILY_TIPS: string[] = [
+  'Start your day with warm lemon water for a gentle liver detox and digestion boost.',
+  'Eating colorful vegetables daily provides a range of antioxidants and phytonutrients.',
+  'Turmeric and black pepper together enhance curcumin absorption by up to 2000%.',
+  'Fermented foods like yogurt and kimchi support a healthy gut microbiome.',
+  'Omega-3 fatty acids from walnuts and flaxseeds help reduce systemic inflammation.',
+  'Aim for 7–9 hours of sleep — it directly regulates hunger hormones and metabolism.',
+  'Mindful eating — chewing slowly and thoroughly — dramatically improves digestion.',
+  'Ginger tea before meals supports digestion and helps reduce bloating.',
+  'Dark leafy greens like spinach and kale are among the most nutrient-dense foods you can eat.',
+  'Staying hydrated (8+ glasses of water daily) keeps energy stable throughout the day.',
+  'Legumes are excellent plant-based protein sources rich in fiber, iron, and folate.',
+  'Ashwagandha is an adaptogen that helps your body manage stress more effectively.',
+  'Avocado is rich in monounsaturated fats and potassium that actively support heart health.',
+  'Berries are low in sugar and packed with antioxidants that protect long-term brain health.',
+  'A protein-rich breakfast reduces afternoon cravings and keeps blood sugar stable all day.',
+  'Raw garlic contains allicin, a powerful antimicrobial and immune-boosting compound.',
+  'Chia seeds absorb water and expand in your stomach, promoting fullness and hydration.',
+  'Green tea contains L-theanine which promotes calm alertness without the coffee jitters.',
+];
+
+function getDailyTip(): string {
+  const start = new Date(new Date().getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((Date.now() - start.getTime()) / 86_400_000);
+  return DAILY_TIPS[dayOfYear % DAILY_TIPS.length];
 }
 
 function getGreeting(): string {
@@ -405,12 +432,12 @@ function getGreeting(): string {
               </div>
               <span class="fw-bold" style="font-size:13px;color:#1a2a1a">Today's Tip</span>
             </div>
-            <p style="font-size:12px;color:#4a3a1a;line-height:1.55;margin-bottom:0.75rem">{{ todayTip() }}</p>
+            <p style="font-size:12px;color:#4a3a1a;line-height:1.55;margin-bottom:0.75rem">{{ todayTip }}</p>
             <button class="btn btn-sm fw-semibold d-flex align-items-center gap-1"
               style="border:1.5px solid #f57c00;color:#f57c00;border-radius:22px;font-size:12px;background:transparent;padding:6px 14px"
-              (click)="goMoodSuggestions()">
-              <mat-icon style="font-size:13px;width:13px;height:13px">wb_sunny</mat-icon>
-              Learn More
+              (click)="goToChat()">
+              <mat-icon style="font-size:13px;width:13px;height:13px">smart_toy</mat-icon>
+              Ask AI
             </button>
           </div>
           <img src="https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=300&auto=format&fit=crop&q=80"
@@ -779,7 +806,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   private rawDiscoveryRecipes = signal<ApiRecipe[]>([]);
 
   activeMood = computed(() => this.moods.find(m => m.key === this.selectedMood()) ?? null);
-  todayTip   = computed(() => this.activeMood()?.tip ?? 'Start your day with a glass of warm lemon water for a gentle detox boost.');
+  todayTip   = getDailyTip();
 
   get userName(): string {
     const user = this.auth.currentUser();
@@ -878,8 +905,12 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   selectMood(key: string)  { this.selectedMood.set(key); }
   goMode(mode: string) {
-    if (mode === 'plan') { this.router.navigate(['/meal-planner']); return; }
+    if (mode === 'plan')           { this.router.navigate(['/meal-planner']); return; }
+    if (mode === 'chat')           { this.router.navigate(['/chat']); return; }
+    if (mode === 'meals')          { this.router.navigate(['/meals']); return; }
+    if (mode === 'pantry-manage')  { this.router.navigate(['/pantry']); return; }
     this.router.navigate(['/recommendations'], { queryParams: { mode } });
   }
+  goToChat()          { this.router.navigate(['/chat']); }
   goMoodSuggestions() { this.router.navigate(['/recommendations'], { queryParams: { mood: this.selectedMood() } }); }
 }
