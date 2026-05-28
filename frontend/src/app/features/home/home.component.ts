@@ -248,10 +248,6 @@ function getGreeting(): string {
             <h2 class="section-title mb-1">How are you feeling today?</h2>
             <p class="text-muted mb-0" style="font-size:12px">Your mood helps us personalize your recommendations.</p>
           </div>
-          <button class="btn btn-outline-success btn-sm d-flex align-items-center gap-1 flex-shrink-0 ms-3"
-            style="border-radius:20px;font-size:12px;padding:5px 12px" (click)="goMoodSuggestions()">
-            <mat-icon style="font-size:13px;width:13px;height:13px">edit</mat-icon> Update Mood
-          </button>
         </div>
         <div class="d-flex gap-2 mt-3 overflow-x-auto pb-1" style="scrollbar-width:none">
           @for (mood of moods; track mood.key) {
