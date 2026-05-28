@@ -289,10 +289,11 @@ function getGreeting(): string {
   <div class="px-3 px-md-4 mt-4">
     <div class="d-flex align-items-center justify-content-between mb-1">
       <h2 class="section-title mb-0 d-flex align-items-center gap-2">
-        {{ auth.isLoggedIn() ? 'Best Recipes From Your Pantry' : 'Recommended for You' }}
+        {{ auth.isLoggedIn() ? 'Best Recipes From Your Pantry' : 'Featured Organic Recipes' }}
         <mat-icon style="font-size:16px;width:16px;height:16px;color:#4caf50">eco</mat-icon>
       </h2>
-      <a class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold d-flex align-items-center gap-1" style="color:#2e7d32" routerLink="/recommendations">
+      <a class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold d-flex align-items-center gap-1" style="color:#2e7d32"
+        [routerLink]="auth.isLoggedIn() ? '/recommendations' : '/meals'">
         View All <mat-icon style="font-size:16px;width:16px;height:16px">chevron_right</mat-icon>
       </a>
     </div>

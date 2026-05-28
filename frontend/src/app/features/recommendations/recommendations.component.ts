@@ -94,7 +94,7 @@ function parseSteps(instructions: string | null): string[] {
     <div class="rec-main">
 
       <!-- Back + title -->
-      <button class="back-link" routerLink="/home">
+      <button class="back-link" routerLink="/">
         <mat-icon style="font-size:15px;width:15px;height:15px">arrow_back</mat-icon>
         Back to Home
       </button>
