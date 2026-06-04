@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional, List
+from typing import Optional, List, Any
 from pydantic import BaseModel, ConfigDict
 
 
@@ -44,3 +44,29 @@ class RecipeOut(BaseModel):
     source_url: Optional[str]
     image_url: Optional[str]
     recipe_ingredients: List[RecipeIngredientOut] = []
+
+
+class AiIngredientOut(BaseModel):
+    name: str
+    quantity: Optional[str] = None
+    unit: Optional[str] = None
+
+
+class GeneratedRecipeOut(BaseModel):
+    id: Optional[str] = None
+    is_ai_generated: bool = False
+    title: str
+    description: Optional[str] = None
+    prep_time_minutes: Optional[int] = None
+    cook_time_minutes: Optional[int] = None
+    servings: int = 2
+    meal_type: Optional[str] = None
+    cuisine_type: Optional[str] = None
+    ingredients: List[AiIngredientOut] = []
+    instructions: List[str] = []
+    nutritional_info: Optional[dict] = None
+    cooking_tips: List[str] = []
+    dietary_labels: List[str] = []
+    health_benefits: List[str] = []
+    ailment_tags: List[str] = []
+    image_url: Optional[str] = None

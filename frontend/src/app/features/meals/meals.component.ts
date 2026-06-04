@@ -7,7 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { FavoritesService, ApiRecipe } from '../../core/services/favorites.service';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
-import { catchError, of } from 'rxjs';
+import { catchError, of, debounceTime, distinctUntilChanged, Subject, switchMap } from 'rxjs';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -25,6 +25,30 @@ interface PantryMatch {
   missingNames: string[];
 }
 
+interface AiIngredient { name: string; quantity: string | null; unit: string | null; }
+
+interface AiRecipe {
+  id: string | null;
+  is_ai_generated: true;
+  title: string;
+  description: string | null;
+  prep_time_minutes: number | null;
+  cook_time_minutes: number | null;
+  servings: number;
+  meal_type: string | null;
+  cuisine_type: string | null;
+  ingredients: AiIngredient[];
+  instructions: string[];
+  nutritional_info: Record<string, number> | null;
+  cooking_tips: string[];
+  dietary_labels: string[];
+  health_benefits: string[];
+  ailment_tags: string[];
+  image_url: string | null;
+}
+
+type DetailRecipe = ApiRecipe | AiRecipe;
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const STOP = new Set(['and','the','with','for','from','made','a','an','in','on','of','easy','quick','style','fresh','organic','healthy']);
@@ -40,24 +64,34 @@ const FALLBACK    = 'https://images.unsplash.com/photo-1512621776951-a57141f2eef
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function recipeImg(r: ApiRecipe): string {
+function recipeImg(r: DetailRecipe): string {
   if (r.image_url) return r.image_url;
-  const words = r.title.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/)
+  const title = r.title;
+  const words = title.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/)
     .filter(w => w.length > 2 && !STOP.has(w)).slice(0, 2);
-  const q = words.length ? words.join(',') : (r.meal_type ?? 'food');
+  const q = words.length ? words.join(',') : 'food';
   return `https://source.unsplash.com/featured/400x260/?food,${encodeURIComponent(q)}`;
 }
 
-function totalMin(r: ApiRecipe): number {
+function totalMin(r: DetailRecipe): number {
   return (r.prep_time_minutes ?? 0) + (r.cook_time_minutes ?? 0);
 }
 
-function diffLabel(r: ApiRecipe): string {
+function diffLabel(r: DetailRecipe): string {
   const m = totalMin(r);
   if (m <= 0)  return 'Quick';
   if (m <= 20) return 'Easy';
   if (m <= 40) return 'Medium';
   return 'Advanced';
+}
+
+function isAiRecipe(r: DetailRecipe): r is AiRecipe {
+  return (r as AiRecipe).is_ai_generated === true;
+}
+
+function parseInstructions(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  return raw.split('\n').map(l => l.replace(/^\d+[\.\):\-]\s*/, '').trim()).filter(Boolean);
 }
 
 function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch[] {
@@ -111,7 +145,7 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
         <div class="seg-icon-wrap"><mat-icon class="seg-ico">travel_explore</mat-icon></div>
         <div class="seg-text">
           <div class="seg-label">Explore Recipes</div>
-          <div class="seg-sub">Explore any recipe you love</div>
+          <div class="seg-sub">Search or discover any recipe</div>
         </div>
       </button>
     </div>
@@ -154,142 +188,155 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
         </div>
       </div>
 
-      <!-- AI Insight Bar -->
-      <div class="section-pad mt-3">
-        <div class="ai-bar">
-          <div class="ai-bar-left">
-            <div class="ai-sparkle"><mat-icon style="font-size:18px;width:18px;height:18px;color:#fff">auto_awesome</mat-icon></div>
-            <div>
-              <div class="ai-bar-title">
-                @if (pantryLoading()) { Analysing your pantry… }
-                @else { Great! You can cook <strong>{{ pantryMatches().length }}</strong> recipes }
-              </div>
-              <div class="ai-bar-sub">Based on your current pantry items</div>
-            </div>
-          </div>
-          <select class="sort-sel" [ngModel]="sortMode()" (ngModelChange)="sortMode.set($event)">
-            @for (s of sortOptions; track s.key) {
-              <option [value]="s.key">{{ s.label }}</option>
-            }
-          </select>
-        </div>
-      </div>
-
-      <!-- Recipe Grid -->
-      <div class="section-pad mt-3">
-        @if (pantryLoading()) {
-          <div class="recipe-grid">
-            @for (s of [1,2,3,4]; track s) {
-              <div class="rec-card">
-                <div class="skeleton" style="height:180px;border-radius:16px 16px 0 0"></div>
-                <div class="rec-card-body">
-                  <div class="skeleton mb-2" style="height:14px;width:68%;border-radius:6px"></div>
-                  <div class="skeleton mb-3" style="height:10px;width:44%;border-radius:4px"></div>
-                  <div class="skeleton mb-1" style="height:10px;width:90%;border-radius:4px"></div>
-                  <div class="skeleton" style="height:10px;width:75%;border-radius:4px"></div>
-                </div>
-              </div>
-            }
-          </div>
-        } @else if (sortedMatches().length === 0) {
+      <!-- Empty Pantry State -->
+      @if (pantryItems().length === 0 && !pantryLoading()) {
+        <div class="section-pad mt-4">
           <div class="empty-card">
-            <mat-icon class="empty-ico">search_off</mat-icon>
-            <h3>No pantry recipes yet</h3>
-            <p>Add ingredients to your pantry and we'll suggest what you can cook.</p>
+            <mat-icon class="empty-ico" style="color:#a5d6a7">kitchen</mat-icon>
+            <h3>Your pantry is empty</h3>
+            <p>Add ingredients to your pantry to get personalized recipe recommendations.</p>
             <a routerLink="/pantry" class="primary-btn">Add Pantry Items</a>
           </div>
-        } @else {
-          <div class="recipe-grid">
-            @for (m of sortedMatches(); track m.recipe.id) {
-              <div class="rec-card" (click)="openDetail(m.recipe)">
-
-                <div class="rec-img-wrap">
-                  <img [src]="recipeImg(m.recipe)" [alt]="m.recipe.title" class="rec-img"
-                       (error)="$any($event.target).src = fallback">
-                  <div class="match-badge"
-                       [class.match-high]="m.matchPct >= 80"
-                       [class.match-mid]="m.matchPct >= 50 && m.matchPct < 80"
-                       [class.match-low]="m.matchPct < 50">
-                    {{ m.matchPct }}% Match
-                  </div>
-                  <button class="heart-btn" [class.hearted]="favSvc.favouriteIds().has(m.recipe.id)"
-                    (click)="$event.stopPropagation(); favSvc.toggle(m.recipe.id, m.recipe)">
-                    <mat-icon style="font-size:17px">{{ favSvc.favouriteIds().has(m.recipe.id) ? 'favorite' : 'favorite_border' }}</mat-icon>
-                  </button>
-                </div>
-
-                <div class="rec-card-body">
-                  <div class="rec-title">{{ m.recipe.title }}</div>
-                  <div class="rec-meta">
-                    <mat-icon class="rec-meta-ico">schedule</mat-icon>
-                    {{ totalMin(m.recipe) > 0 ? totalMin(m.recipe) + ' min' : 'Quick' }}
-                    <span class="rec-sep">·</span>
-                    <span class="rec-diff"
-                          [class.diff-easy]="diffLabel(m.recipe) === 'Easy' || diffLabel(m.recipe) === 'Quick'"
-                          [class.diff-med]="diffLabel(m.recipe) === 'Medium'">{{ diffLabel(m.recipe) }}</span>
-                  </div>
-
-                  <div class="ing-info">
-                    @if (m.haveCount > 0) {
-                      <div class="ing-row">
-                        <mat-icon class="ing-ico have-ico">check_circle</mat-icon>
-                        <span class="ing-text">
-                          <strong>You have:</strong>
-                          {{ m.haveNames.join(', ') }}{{ m.haveCount > 3 ? ' +' + (m.haveCount - 3) : '' }}
-                        </span>
-                      </div>
-                    }
-                    @if (m.missingCount > 0) {
-                      <div class="ing-row">
-                        <mat-icon class="ing-ico miss-ico">remove_circle_outline</mat-icon>
-                        <span class="ing-text">
-                          <strong>Missing:</strong>
-                          {{ m.missingNames.join(', ') }}{{ m.missingCount > 3 ? ' +' + (m.missingCount - 3) : '' }}
-                        </span>
-                      </div>
-                    }
-                    @if (m.missingCount === 0) {
-                      <div class="can-make-tag">
-                        <mat-icon style="font-size:12px;width:12px;height:12px">check</mat-icon> Ready to cook!
-                      </div>
-                    }
-                  </div>
-
-                  <button class="cook-btn" (click)="$event.stopPropagation(); openDetail(m.recipe)">
-                    <mat-icon style="font-size:13px;width:13px;height:13px">restaurant</mat-icon>
-                    Cook Now
-                  </button>
-                </div>
-              </div>
-            }
-          </div>
-        }
-      </div>
-
-      <!-- Bottom Insight Card -->
-      <div class="section-pad mt-4 mb-5">
-        <div class="insight-card">
-          <div class="insight-top-row">
-            <div class="insight-icon"><mat-icon style="font-size:20px;width:20px;height:20px;color:#f57c00">lightbulb</mat-icon></div>
-            <div>
-              <div class="insight-title">Add 2 more ingredients to unlock more recipes</div>
-              <div class="insight-sub">Get even better recipe matches by adding these to your pantry.</div>
-            </div>
-          </div>
-          <div class="suggest-chips mt-3">
-            @for (s of suggested; track s) {
-              <button class="suggest-chip" (click)="router.navigate(['/pantry'])">
-                <mat-icon style="font-size:11px;width:11px;height:11px">add</mat-icon> {{ s }}
-              </button>
-            }
-          </div>
-          <button class="outline-btn mt-3" routerLink="/pantry">
-            <mat-icon style="font-size:15px;width:15px;height:15px">shopping_cart</mat-icon>
-            View All Missing Ingredients
-          </button>
         </div>
-      </div>
+      } @else {
 
+        <!-- AI Insight Bar -->
+        <div class="section-pad mt-3">
+          <div class="ai-bar">
+            <div class="ai-bar-left">
+              <div class="ai-sparkle"><mat-icon style="font-size:18px;width:18px;height:18px;color:#fff">auto_awesome</mat-icon></div>
+              <div>
+                <div class="ai-bar-title">
+                  @if (pantryLoading()) { Analysing your pantry… }
+                  @else { Great! You can cook <strong>{{ pantryMatches().length }}</strong> recipes }
+                </div>
+                <div class="ai-bar-sub">Based on your current pantry items</div>
+              </div>
+            </div>
+            <select class="sort-sel" [ngModel]="sortMode()" (ngModelChange)="sortMode.set($event)">
+              @for (s of sortOptions; track s.key) {
+                <option [value]="s.key">{{ s.label }}</option>
+              }
+            </select>
+          </div>
+        </div>
+
+        <!-- Recipe Grid -->
+        <div class="section-pad mt-3">
+          @if (pantryLoading()) {
+            <div class="recipe-grid">
+              @for (s of [1,2,3,4]; track s) {
+                <div class="rec-card">
+                  <div class="skeleton" style="height:180px;border-radius:16px 16px 0 0"></div>
+                  <div class="rec-card-body">
+                    <div class="skeleton mb-2" style="height:14px;width:68%;border-radius:6px"></div>
+                    <div class="skeleton mb-3" style="height:10px;width:44%;border-radius:4px"></div>
+                    <div class="skeleton mb-1" style="height:10px;width:90%;border-radius:4px"></div>
+                    <div class="skeleton" style="height:10px;width:75%;border-radius:4px"></div>
+                  </div>
+                </div>
+              }
+            </div>
+          } @else if (sortedMatches().length === 0) {
+            <div class="empty-card">
+              <mat-icon class="empty-ico">search_off</mat-icon>
+              <h3>No matching recipes found</h3>
+              <p>Add more ingredients to your pantry and we'll suggest what you can cook.</p>
+              <a routerLink="/pantry" class="primary-btn">Add Pantry Items</a>
+            </div>
+          } @else {
+            <div class="recipe-grid">
+              @for (m of sortedMatches(); track m.recipe.id) {
+                <div class="rec-card" (click)="openDetail(m.recipe)">
+
+                  <div class="rec-img-wrap">
+                    <img [src]="recipeImg(m.recipe)" [alt]="m.recipe.title" class="rec-img"
+                         (error)="$any($event.target).src = fallback">
+                    <div class="match-badge"
+                         [class.match-high]="m.matchPct >= 80"
+                         [class.match-mid]="m.matchPct >= 50 && m.matchPct < 80"
+                         [class.match-low]="m.matchPct < 50">
+                      {{ m.matchPct }}% Match
+                    </div>
+                    <button class="heart-btn" [class.hearted]="favSvc.favouriteIds().has(m.recipe.id)"
+                      (click)="$event.stopPropagation(); favSvc.toggle(m.recipe.id, m.recipe)">
+                      <mat-icon style="font-size:17px">{{ favSvc.favouriteIds().has(m.recipe.id) ? 'favorite' : 'favorite_border' }}</mat-icon>
+                    </button>
+                  </div>
+
+                  <div class="rec-card-body">
+                    <div class="rec-title">{{ m.recipe.title }}</div>
+                    <div class="rec-meta">
+                      <mat-icon class="rec-meta-ico">schedule</mat-icon>
+                      {{ totalMin(m.recipe) > 0 ? totalMin(m.recipe) + ' min' : 'Quick' }}
+                      <span class="rec-sep">·</span>
+                      <span class="rec-diff"
+                            [class.diff-easy]="diffLabel(m.recipe) === 'Easy' || diffLabel(m.recipe) === 'Quick'"
+                            [class.diff-med]="diffLabel(m.recipe) === 'Medium'">{{ diffLabel(m.recipe) }}</span>
+                    </div>
+
+                    <div class="ing-info">
+                      @if (m.haveCount > 0) {
+                        <div class="ing-row">
+                          <mat-icon class="ing-ico have-ico">check_circle</mat-icon>
+                          <span class="ing-text">
+                            <strong>You have:</strong>
+                            {{ m.haveNames.join(', ') }}{{ m.haveCount > 3 ? ' +' + (m.haveCount - 3) : '' }}
+                          </span>
+                        </div>
+                      }
+                      @if (m.missingCount > 0) {
+                        <div class="ing-row">
+                          <mat-icon class="ing-ico miss-ico">remove_circle_outline</mat-icon>
+                          <span class="ing-text">
+                            <strong>Missing:</strong>
+                            {{ m.missingNames.join(', ') }}{{ m.missingCount > 3 ? ' +' + (m.missingCount - 3) : '' }}
+                          </span>
+                        </div>
+                      }
+                      @if (m.missingCount === 0) {
+                        <div class="can-make-tag">
+                          <mat-icon style="font-size:12px;width:12px;height:12px">check</mat-icon> Ready to cook!
+                        </div>
+                      }
+                    </div>
+
+                    <button class="cook-btn" (click)="$event.stopPropagation(); openDetail(m.recipe)">
+                      <mat-icon style="font-size:13px;width:13px;height:13px">restaurant</mat-icon>
+                      Cook Now
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- Bottom Insight Card -->
+        <div class="section-pad mt-4 mb-5">
+          <div class="insight-card">
+            <div class="insight-top-row">
+              <div class="insight-icon"><mat-icon style="font-size:20px;width:20px;height:20px;color:#f57c00">lightbulb</mat-icon></div>
+              <div>
+                <div class="insight-title">Add 2 more ingredients to unlock more recipes</div>
+                <div class="insight-sub">Get even better recipe matches by adding these to your pantry.</div>
+              </div>
+            </div>
+            <div class="suggest-chips mt-3">
+              @for (s of suggested; track s) {
+                <button class="suggest-chip" (click)="router.navigate(['/pantry'])">
+                  <mat-icon style="font-size:11px;width:11px;height:11px">add</mat-icon> {{ s }}
+                </button>
+              }
+            </div>
+            <button class="outline-btn mt-3" routerLink="/pantry">
+              <mat-icon style="font-size:15px;width:15px;height:15px">shopping_cart</mat-icon>
+              View All Missing Ingredients
+            </button>
+          </div>
+        </div>
+
+      }
     }
   </div>
   }
@@ -300,12 +347,12 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
 
     <!-- Search bar -->
     <div class="section-pad mt-4">
-      <div class="exp-search">
+      <div class="exp-search" [class.exp-search-active]="searchText()">
         <mat-icon class="exp-search-ico">search</mat-icon>
-        <input class="exp-search-input" placeholder="Search recipes, cuisines, ingredients…"
-               [ngModel]="searchText()" (ngModelChange)="searchText.set($event)">
+        <input class="exp-search-input" placeholder="Search any recipe — we'll find or create it for you…"
+               [ngModel]="searchText()" (ngModelChange)="onSearchChange($event)">
         @if (searchText()) {
-          <button class="exp-search-clear" (click)="searchText.set('')">
+          <button class="exp-search-clear" (click)="clearSearch()">
             <mat-icon style="font-size:15px">close</mat-icon>
           </button>
         }
@@ -336,10 +383,73 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
       </div>
     </div>
 
-    <!-- Result count -->
-    @if (!exploreLoading()) {
+    <!-- AI Search loading -->
+    @if (aiSearchLoading()) {
+      <div class="section-pad mt-4">
+        <div class="ai-search-loading">
+          <div class="ai-search-spinner"></div>
+          <div>
+            <div class="ai-search-label">AI is generating this recipe…</div>
+            <div class="ai-search-sub">Not found in our database — creating a fresh recipe for you</div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- AI Generated Result -->
+    @if (aiRecipe() && !aiSearchLoading()) {
+      <div class="section-pad mt-4">
+        <div class="ai-result-banner">
+          <mat-icon style="font-size:16px;width:16px;height:16px;color:#fff">auto_awesome</mat-icon>
+          <span>AI Generated Recipe — not in our database</span>
+        </div>
+        <div class="rec-card ai-rec-card" (click)="openDetail(aiRecipe()!)">
+          <div class="rec-img-wrap">
+            <img [src]="recipeImg(aiRecipe()!)" [alt]="aiRecipe()!.title" class="rec-img"
+                 (error)="$any($event.target).src = fallback">
+            <div class="ai-badge">
+              <mat-icon style="font-size:11px;width:11px;height:11px">auto_awesome</mat-icon> AI
+            </div>
+          </div>
+          <div class="rec-card-body">
+            <div class="rec-title">{{ aiRecipe()!.title }}</div>
+            @if (aiRecipe()!.description) {
+              <p class="rec-desc">{{ aiRecipe()!.description }}</p>
+            }
+            <div class="rec-meta">
+              <mat-icon class="rec-meta-ico">schedule</mat-icon>
+              {{ totalMin(aiRecipe()!) > 0 ? totalMin(aiRecipe()!) + ' min' : 'Quick' }}
+              <span class="rec-sep">·</span>
+              <span class="rec-diff" [class.diff-easy]="diffLabel(aiRecipe()!) === 'Easy' || diffLabel(aiRecipe()!) === 'Quick'"
+                    [class.diff-med]="diffLabel(aiRecipe()!) === 'Medium'">{{ diffLabel(aiRecipe()!) }}</span>
+            </div>
+            @if (aiRecipe()!.nutritional_info) {
+              <div class="mini-nutrition">
+                @if (aiRecipe()!.nutritional_info!['calories']) {
+                  <span class="mini-nutr-chip">🔥 {{ aiRecipe()!.nutritional_info!['calories'] }} cal</span>
+                }
+                @if (aiRecipe()!.nutritional_info!['protein_g']) {
+                  <span class="mini-nutr-chip">💪 {{ aiRecipe()!.nutritional_info!['protein_g'] }}g protein</span>
+                }
+              </div>
+            }
+            <button class="cook-btn mt-2" (click)="$event.stopPropagation(); openDetail(aiRecipe()!)">
+              <mat-icon style="font-size:13px;width:13px;height:13px">menu_book</mat-icon>
+              View Recipe
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Result count / default label -->
+    @if (!aiSearchLoading()) {
       <div class="section-pad mt-3">
-        <p class="results-label">{{ filteredExplore().length }} recipe{{ filteredExplore().length !== 1 ? 's' : '' }} found</p>
+        @if (searchText() && !aiRecipe()) {
+          <p class="results-label">{{ filteredExplore().length }} recipe{{ filteredExplore().length !== 1 ? 's' : '' }} found</p>
+        } @else if (!searchText()) {
+          <p class="results-label">{{ featuredRecipes().length }} featured recipes</p>
+        }
       </div>
     }
 
@@ -349,24 +459,29 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
         <div class="explore-grid">
           @for (s of [1,2,3,4,5,6]; track s) {
             <div class="exp-card">
-              <div class="skeleton" style="height:140px;border-radius:14px 14px 0 0"></div>
+              <div class="skeleton" style="height:160px;border-radius:14px 14px 0 0"></div>
               <div style="padding:10px 12px 12px">
                 <div class="skeleton mb-2" style="height:14px;width:75%;border-radius:6px"></div>
+                <div class="skeleton mb-2" style="height:10px;width:90%;border-radius:4px"></div>
                 <div class="skeleton" style="height:10px;width:45%;border-radius:4px"></div>
               </div>
             </div>
           }
         </div>
-      } @else if (filteredExplore().length === 0) {
-        <div class="empty-card">
-          <mat-icon class="empty-ico" style="color:#b0bec5">search_off</mat-icon>
-          <h3>No recipes found</h3>
-          <p>Try a different search term or clear your filters.</p>
-          <button class="primary-btn" (click)="clearExplore()">Clear Filters</button>
-        </div>
+      } @else if (!aiRecipe() && filteredExplore().length === 0 && searchText()) {
+        <!-- Empty state shown only if AI hasn't loaded yet -->
+        @if (!aiSearchLoading()) {
+          <div class="empty-card">
+            <mat-icon class="empty-ico" style="color:#b0bec5">search_off</mat-icon>
+            <h3>No recipes found</h3>
+            <p>Try a different search term or clear your filters.</p>
+            <button class="primary-btn" (click)="clearExplore()">Clear Filters</button>
+          </div>
+        }
       } @else {
+        <!-- Default: 5 featured. Filtered: all matches -->
         <div class="explore-grid">
-          @for (r of filteredExplore(); track r.id) {
+          @for (r of displayedExplore(); track r.id) {
             <div class="exp-card" (click)="openDetail(r)">
               <div class="exp-img-wrap">
                 <img [src]="recipeImg(r)" [alt]="r.title" class="exp-img"
@@ -381,6 +496,9 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
               </div>
               <div class="exp-card-body">
                 <div class="exp-title">{{ r.title }}</div>
+                @if (r.description) {
+                  <p class="exp-desc">{{ r.description }}</p>
+                }
                 <div class="exp-meta-row">
                   <mat-icon style="font-size:11px;width:11px;height:11px;color:#9e9e9e">schedule</mat-icon>
                   <span>{{ totalMin(r) > 0 ? totalMin(r) + ' min' : 'Quick' }}</span>
@@ -390,10 +508,26 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
                 @if (r.health_benefits.length > 0) {
                   <span class="exp-benefit">{{ r.health_benefits[0] }}</span>
                 }
+                <button class="view-btn" (click)="$event.stopPropagation(); openDetail(r)">
+                  <mat-icon style="font-size:12px;width:12px;height:12px">menu_book</mat-icon>
+                  View Recipe
+                </button>
               </div>
             </div>
           }
         </div>
+
+        <!-- Show all button when in default (5 featured) view -->
+        @if (!searchText() && activeFilter() === 'All' && !activeDietFilter() && exploreRecipes().length > 5) {
+          <div class="show-all-wrap mt-4">
+            <button class="show-all-btn" (click)="showAllExplore.set(!showAllExplore())">
+              <mat-icon style="font-size:15px;width:15px;height:15px">
+                {{ showAllExplore() ? 'expand_less' : 'expand_more' }}
+              </mat-icon>
+              {{ showAllExplore() ? 'Show Less' : 'Show All ' + exploreRecipes().length + ' Recipes' }}
+            </button>
+          </div>
+        }
       }
     </div>
 
@@ -418,10 +552,17 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
           <button class="d-close" (click)="closeDetail()">
             <mat-icon style="font-size:17px">close</mat-icon>
           </button>
-          <button class="d-heart" [class.hearted]="favSvc.favouriteIds().has(r.id)"
-            (click)="favSvc.toggle(r.id, r)">
-            <mat-icon style="font-size:19px">{{ favSvc.favouriteIds().has(r.id) ? 'favorite' : 'favorite_border' }}</mat-icon>
-          </button>
+          @if (!isAiRecipe(r)) {
+            <button class="d-heart" [class.hearted]="favSvc.favouriteIds().has($any(r).id)"
+              (click)="favSvc.toggle($any(r).id, $any(r))">
+              <mat-icon style="font-size:19px">{{ favSvc.favouriteIds().has($any(r).id) ? 'favorite' : 'favorite_border' }}</mat-icon>
+            </button>
+          }
+          @if (isAiRecipe(r)) {
+            <div class="d-ai-badge">
+              <mat-icon style="font-size:12px;width:12px;height:12px">auto_awesome</mat-icon> AI Generated
+            </div>
+          }
           <div class="detail-img-footer">
             <h2 class="d-title">{{ r.title }}</h2>
             <div class="d-meta-row">
@@ -439,11 +580,19 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
                   {{ r.servings }} servings
                 </span>
               }
+              @if (r.cuisine_type) {
+                <span class="d-meta-chip">
+                  <mat-icon style="font-size:12px;width:12px;height:12px">public</mat-icon>
+                  {{ r.cuisine_type }}
+                </span>
+              }
             </div>
           </div>
         </div>
 
         <div class="detail-body">
+
+          <!-- Tags -->
           <div class="d-tags-row">
             @for (l of r.dietary_labels.slice(0,4); track l) {
               <span class="d-tag d-tag-diet">{{ l }}</span>
@@ -453,10 +602,143 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
             }
           </div>
 
+          <!-- Description -->
           @if (r.description) {
             <p class="d-desc">{{ r.description }}</p>
           }
 
+          <!-- Nutrition Grid -->
+          @if (r.nutritional_info) {
+            <div class="d-section">
+              <div class="d-section-title">
+                <mat-icon style="font-size:15px;width:15px;height:15px;color:#2e7d32;vertical-align:middle">bar_chart</mat-icon>
+                Nutrition Info
+              </div>
+              <div class="nutrition-grid">
+                @if (r.nutritional_info['calories']) {
+                  <div class="nutr-card nutr-cal">
+                    <div class="nutr-val">{{ r.nutritional_info['calories'] }}</div>
+                    <div class="nutr-label">Calories</div>
+                  </div>
+                }
+                @if (r.nutritional_info['protein_g']) {
+                  <div class="nutr-card nutr-pro">
+                    <div class="nutr-val">{{ r.nutritional_info['protein_g'] }}g</div>
+                    <div class="nutr-label">Protein</div>
+                  </div>
+                }
+                @if (r.nutritional_info['carbs_g']) {
+                  <div class="nutr-card nutr-carb">
+                    <div class="nutr-val">{{ r.nutritional_info['carbs_g'] }}g</div>
+                    <div class="nutr-label">Carbs</div>
+                  </div>
+                }
+                @if (r.nutritional_info['fat_g']) {
+                  <div class="nutr-card nutr-fat">
+                    <div class="nutr-val">{{ r.nutritional_info['fat_g'] }}g</div>
+                    <div class="nutr-label">Fat</div>
+                  </div>
+                }
+                @if (r.nutritional_info['fiber_g']) {
+                  <div class="nutr-card nutr-fib">
+                    <div class="nutr-val">{{ r.nutritional_info['fiber_g'] }}g</div>
+                    <div class="nutr-label">Fiber</div>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- Ingredients (AI recipe) -->
+          @if (isAiRecipe(r) && r.ingredients.length > 0) {
+            <div class="d-section">
+              <div class="d-section-title">
+                <mat-icon style="font-size:15px;width:15px;height:15px;color:#2e7d32;vertical-align:middle">grocery</mat-icon>
+                Ingredients
+              </div>
+              <ul class="d-ing-list">
+                @for (ing of r.ingredients; track ing.name) {
+                  <li class="d-ing-item">
+                    <span class="d-ing-dot"></span>
+                    <span class="d-ing-qty">{{ ing.quantity ?? '' }} {{ ing.unit ?? '' }}</span>
+                    {{ ing.name }}
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+
+          <!-- Ingredients (DB recipe) -->
+          @if (!isAiRecipe(r) && $any(r).recipe_ingredients?.length > 0) {
+            <div class="d-section">
+              <div class="d-section-title">
+                <mat-icon style="font-size:15px;width:15px;height:15px;color:#2e7d32;vertical-align:middle">grocery</mat-icon>
+                Ingredients
+              </div>
+              <ul class="d-ing-list">
+                @for (ri of $any(r).recipe_ingredients; track ri.ingredient.name) {
+                  <li class="d-ing-item">
+                    <span class="d-ing-dot"></span>
+                    <span class="d-ing-qty">{{ ri.quantity ?? '' }} {{ ri.unit ?? '' }}</span>
+                    {{ ri.ingredient.name }}
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+
+          <!-- Instructions (AI recipe) -->
+          @if (isAiRecipe(r) && r.instructions.length > 0) {
+            <div class="d-section">
+              <div class="d-section-title">
+                <mat-icon style="font-size:15px;width:15px;height:15px;color:#2e7d32;vertical-align:middle">format_list_numbered</mat-icon>
+                Instructions
+              </div>
+              <ol class="d-steps-list">
+                @for (step of r.instructions; track $index) {
+                  <li class="d-step-item">
+                    <span class="d-step-num">{{ $index + 1 }}</span>
+                    <span class="d-step-text">{{ step }}</span>
+                  </li>
+                }
+              </ol>
+            </div>
+          }
+
+          <!-- Instructions (DB recipe) -->
+          @if (!isAiRecipe(r) && $any(r).instructions) {
+            <div class="d-section">
+              <div class="d-section-title">
+                <mat-icon style="font-size:15px;width:15px;height:15px;color:#2e7d32;vertical-align:middle">format_list_numbered</mat-icon>
+                Instructions
+              </div>
+              <ol class="d-steps-list">
+                @for (step of parseInstructions($any(r).instructions); track $index) {
+                  <li class="d-step-item">
+                    <span class="d-step-num">{{ $index + 1 }}</span>
+                    <span class="d-step-text">{{ step }}</span>
+                  </li>
+                }
+              </ol>
+            </div>
+          }
+
+          <!-- Cooking Tips (AI recipe) -->
+          @if (isAiRecipe(r) && r.cooking_tips.length > 0) {
+            <div class="d-section">
+              <div class="d-section-title">
+                <mat-icon style="font-size:15px;width:15px;height:15px;color:#f57c00;vertical-align:middle">lightbulb</mat-icon>
+                Cooking Tips
+              </div>
+              <ul class="d-tips-list">
+                @for (tip of r.cooking_tips; track $index) {
+                  <li class="d-tip-item">{{ tip }}</li>
+                }
+              </ul>
+            </div>
+          }
+
+          <!-- Health Benefits -->
           @if (r.health_benefits.length > 0) {
             <div class="d-section">
               <div class="d-section-title">Health Benefits</div>
@@ -468,20 +750,6 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
             </div>
           }
 
-          @if (r.recipe_ingredients.length > 0) {
-            <div class="d-section">
-              <div class="d-section-title">Ingredients</div>
-              <ul class="d-ing-list">
-                @for (ri of r.recipe_ingredients; track ri.ingredient.name) {
-                  <li class="d-ing-item">
-                    <span class="d-ing-dot"></span>
-                    <span class="d-ing-qty">{{ ri.quantity ?? '' }} {{ ri.unit ?? '' }}</span>
-                    {{ ri.ingredient.name }}
-                  </li>
-                }
-              </ul>
-            </div>
-          }
         </div>
       </div>
     </div>
@@ -655,6 +923,7 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
       display: flex; flex-direction: column;
     }
     .rec-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+    .ai-rec-card { max-width: 340px; }
 
     .rec-img-wrap { position: relative; height: 160px; overflow: hidden; }
     .rec-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.3s; }
@@ -668,6 +937,14 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
     .match-high { background: #2e7d32; }
     .match-mid  { background: #f57c00; }
     .match-low  { background: #c62828; }
+
+    .ai-badge {
+      position: absolute; top: 9px; left: 9px;
+      display: flex; align-items: center; gap: 3px;
+      background: linear-gradient(135deg, #6a1b9a, #9c27b0);
+      color: #fff; border-radius: 20px; padding: 3px 9px;
+      font-size: 11px; font-weight: 700;
+    }
 
     .heart-btn {
       position: absolute; top: 8px; right: 8px;
@@ -686,6 +963,10 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
       line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2;
       -webkit-box-orient: vertical; overflow: hidden;
     }
+    .rec-desc {
+      font-size: 11px; color: #6b7c6b; line-height: 1.4; margin: 0;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
     .rec-meta {
       display: flex; align-items: center; gap: 4px;
       font-size: 11px; color: #9e9e9e;
@@ -695,6 +976,12 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
     .rec-diff { font-weight: 600; }
     .diff-easy { color: #2e7d32; }
     .diff-med  { color: #f57c00; }
+
+    .mini-nutrition { display: flex; gap: 6px; flex-wrap: wrap; }
+    .mini-nutr-chip {
+      font-size: 10px; font-weight: 600; color: #1a2a1a;
+      background: #f1f8f1; border-radius: 8px; padding: 2px 8px;
+    }
 
     .ing-info { display: flex; flex-direction: column; gap: 4px; flex: 1; }
     .ing-row  { display: flex; align-items: flex-start; gap: 5px; }
@@ -710,13 +997,14 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
       padding: 3px 8px; font-size: 10px; font-weight: 700;
     }
 
-    .cook-btn {
+    .cook-btn, .view-btn {
       display: flex; align-items: center; justify-content: center; gap: 5px;
-      background: #2e7d32; color: #fff; border: none; border-radius: 10px;
+      border: none; border-radius: 10px;
       padding: 8px; font-size: 12px; font-weight: 600; cursor: pointer;
       transition: background 0.15s; margin-top: auto;
-      &:hover { background: #1b5e20; }
     }
+    .cook-btn { background: #2e7d32; color: #fff; &:hover { background: #1b5e20; } }
+    .view-btn { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; &:hover { background: #d4edda; } }
 
     /* ── Empty / skeleton ───────────────────────────────────── */
     .empty-card {
@@ -779,7 +1067,9 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
       display: flex; align-items: center; gap: 10px;
       background: #fff; border-radius: 14px; padding: 12px 16px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      transition: box-shadow 0.2s;
     }
+    .exp-search.exp-search-active { box-shadow: 0 4px 18px rgba(46,125,50,0.18); border: 1.5px solid #a5d6a7; }
     .exp-search-ico { font-size: 20px; width: 20px; height: 20px; color: #9e9e9e; flex-shrink: 0; }
     .exp-search-input {
       flex: 1; border: none; outline: none;
@@ -789,6 +1079,29 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
     .exp-search-clear {
       background: none; border: none; cursor: pointer; padding: 0;
       display: flex; align-items: center; color: #9e9e9e;
+    }
+
+    /* ── AI Search Loading ──────────────────────────────────── */
+    .ai-search-loading {
+      display: flex; align-items: center; gap: 14px;
+      background: linear-gradient(135deg, #f3e5f5, #ede7f6);
+      border: 1.5px solid #ce93d8; border-radius: 14px; padding: 14px 16px;
+    }
+    .ai-search-spinner {
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+      border: 3px solid #ce93d8; border-top-color: #9c27b0;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .ai-search-label { font-size: 13px; font-weight: 700; color: #6a1b9a; }
+    .ai-search-sub   { font-size: 11px; color: #9c27b0; margin-top: 2px; }
+
+    /* ── AI Result Banner ───────────────────────────────────── */
+    .ai-result-banner {
+      display: flex; align-items: center; gap: 8px;
+      background: linear-gradient(135deg, #6a1b9a, #9c27b0);
+      color: #fff; border-radius: 10px; padding: 8px 14px;
+      font-size: 12px; font-weight: 600; margin-bottom: 10px;
     }
 
     .filter-row { display: flex; gap: 7px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; &::-webkit-scrollbar { display: none; } }
@@ -819,10 +1132,11 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
       background: #fff; border-radius: 14px; overflow: hidden;
       box-shadow: 0 2px 8px rgba(0,0,0,0.07); cursor: pointer;
       transition: transform 0.18s, box-shadow 0.18s;
+      display: flex; flex-direction: column;
     }
     .exp-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.12); }
 
-    .exp-img-wrap { position: relative; height: 140px; overflow: hidden; }
+    .exp-img-wrap { position: relative; height: 160px; overflow: hidden; }
     .exp-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.3s; }
     .exp-card:hover .exp-img { transform: scale(1.06); }
 
@@ -840,17 +1154,31 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
       border-radius: 8px; padding: 2px 8px; font-size: 10px; font-weight: 600;
     }
 
-    .exp-card-body { padding: 10px 12px 12px; }
+    .exp-card-body { padding: 10px 12px 12px; flex: 1; display: flex; flex-direction: column; gap: 5px; }
     .exp-title {
-      font-size: 13px; font-weight: 700; color: #1a2a1a; margin-bottom: 5px;
+      font-size: 13px; font-weight: 700; color: #1a2a1a; margin-bottom: 2px;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .exp-desc {
+      font-size: 11px; color: #6b7c6b; line-height: 1.4; margin: 0;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     }
     .exp-meta-row { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #9e9e9e; }
     .exp-dot { margin: 0 2px; }
     .exp-benefit {
-      display: inline-block; margin-top: 6px;
+      display: inline-block;
       background: #e8f5e9; color: #2e7d32; border-radius: 8px;
       padding: 2px 8px; font-size: 10px; font-weight: 600;
+    }
+
+    /* ── Show All Button ────────────────────────────────────── */
+    .show-all-wrap { display: flex; justify-content: center; }
+    .show-all-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: #fff; border: 1.5px solid #c8e6c9; color: #2e7d32;
+      border-radius: 24px; padding: 10px 24px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+      &:hover { background: #e8f5e9; border-color: #81c784; }
     }
 
     /* ── Floating AI Button ─────────────────────────────────── */
@@ -872,16 +1200,16 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
       display: flex; align-items: flex-end; justify-content: center;
     }
     .detail-modal {
-      width: 100%; max-width: 560px; max-height: 88vh;
+      width: 100%; max-width: 560px; max-height: 90vh;
       background: #fff; border-radius: 24px 24px 0 0; overflow-y: auto;
       animation: slideUp 0.28s ease-out;
     }
     @media (min-width: 768px) {
       .detail-backdrop { align-items: center; }
-      .detail-modal { border-radius: 24px; max-height: 82vh; }
+      .detail-modal { border-radius: 24px; max-height: 85vh; }
     }
 
-    .detail-img-wrap { position: relative; height: 220px; overflow: hidden; }
+    .detail-img-wrap { position: relative; height: 230px; overflow: hidden; flex-shrink: 0; }
     .detail-img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .detail-img-overlay {
       position: absolute; inset: 0;
@@ -894,6 +1222,13 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
     }
     .d-close  { left: 12px;  mat-icon { color: #555; } }
     .d-heart  { right: 12px; mat-icon { color: #bdbdbd; } &.hearted mat-icon { color: #e53935; } }
+    .d-ai-badge {
+      position: absolute; top: 14px; right: 14px; z-index: 2;
+      display: flex; align-items: center; gap: 4px;
+      background: linear-gradient(135deg, #6a1b9a, #9c27b0);
+      color: #fff; border-radius: 20px; padding: 5px 12px;
+      font-size: 11px; font-weight: 700;
+    }
 
     .detail-img-footer {
       position: absolute; bottom: 0; left: 0; right: 0;
@@ -907,22 +1242,63 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
       border-radius: 8px; padding: 4px 9px; font-size: 11px; font-weight: 600;
     }
 
-    .detail-body { padding: 16px 18px 32px; }
+    .detail-body { padding: 16px 18px 36px; }
     .d-tags-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
     .d-tag { padding: 4px 10px; border-radius: 10px; font-size: 11px; font-weight: 600; }
     .d-tag-diet    { background: #e3f2fd; color: #1565c0; }
     .d-tag-ailment { background: #e0f2f1; color: #00695c; }
-    .d-desc { font-size: 14px; color: #555; line-height: 1.6; margin-bottom: 14px; }
+    .d-desc { font-size: 14px; color: #555; line-height: 1.6; margin-bottom: 16px; }
 
-    .d-section { margin-bottom: 16px; }
-    .d-section-title { font-size: 14px; font-weight: 700; color: #1a2a1a; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #f0f0f0; }
+    /* ── Nutrition Grid ─────────────────────────────────────── */
+    .nutrition-grid {
+      display: flex; gap: 8px; flex-wrap: wrap;
+    }
+    .nutr-card {
+      flex: 1; min-width: 60px; border-radius: 12px;
+      padding: 10px 8px; text-align: center;
+    }
+    .nutr-val   { font-size: 16px; font-weight: 800; color: #1a2a1a; }
+    .nutr-label { font-size: 10px; font-weight: 500; color: #6b7c6b; margin-top: 2px; }
+    .nutr-cal  { background: #fff3e0; }
+    .nutr-pro  { background: #e8f5e9; }
+    .nutr-carb { background: #e3f2fd; }
+    .nutr-fat  { background: #fce4ec; }
+    .nutr-fib  { background: #f3e5f5; }
+
+    /* ── Detail Sections ────────────────────────────────────── */
+    .d-section { margin-bottom: 18px; }
+    .d-section-title {
+      font-size: 14px; font-weight: 700; color: #1a2a1a; margin-bottom: 10px;
+      padding-bottom: 6px; border-bottom: 1px solid #f0f0f0;
+      display: flex; align-items: center; gap: 6px;
+    }
     .d-benefit-chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .d-benefit { padding: 4px 10px; background: #e8f5e9; color: #2e7d32; border-radius: 10px; font-size: 11px; font-weight: 600; }
 
+    /* ── Ingredients List ───────────────────────────────────── */
     .d-ing-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 7px; }
     .d-ing-item { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: #444; }
     .d-ing-dot  { width: 7px; height: 7px; border-radius: 50%; background: #2e7d32; flex-shrink: 0; margin-top: 5px; }
     .d-ing-qty  { font-weight: 600; color: #2e7d32; min-width: 44px; flex-shrink: 0; }
+
+    /* ── Steps List ─────────────────────────────────────────── */
+    .d-steps-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+    .d-step-item  { display: flex; align-items: flex-start; gap: 10px; }
+    .d-step-num   {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: #2e7d32; color: #fff;
+      font-size: 11px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
+    }
+    .d-step-text  { font-size: 13px; color: #444; line-height: 1.55; }
+
+    /* ── Tips List ──────────────────────────────────────────── */
+    .d-tips-list  { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+    .d-tip-item   {
+      font-size: 13px; color: #5a4a2a; line-height: 1.5;
+      background: #fff8e1; border-left: 3px solid #ffc107;
+      border-radius: 0 8px 8px 0; padding: 8px 12px;
+    }
 
     @keyframes slideUp {
       from { transform: translateY(40px); opacity: 0; }
@@ -936,6 +1312,11 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
       .section-pad { padding: 0 40px; }
       .fab { bottom: 32px; right: 32px; }
     }
+
+    .mt-2 { margin-top: 8px; }
+    .mt-3 { margin-top: 12px; }
+    .mt-4 { margin-top: 16px; }
+    .mb-5 { margin-bottom: 32px; }
   `],
 })
 export class MealsComponent implements OnInit {
@@ -957,9 +1338,15 @@ export class MealsComponent implements OnInit {
   searchText       = signal('');
   activeFilter     = signal('All');
   activeDietFilter = signal('');
+  showAllExplore   = signal(false);
+
+  aiRecipe         = signal<AiRecipe | null>(null);
+  aiSearchLoading  = signal(false);
 
   detailOpen   = signal(false);
-  detailRecipe = signal<ApiRecipe | null>(null);
+  detailRecipe = signal<DetailRecipe | null>(null);
+
+  private searchSubject = new Subject<string>();
 
   // ── Constants exposed to template ─────────────────────────
   sortOptions = SORT_OPTIONS;
@@ -1017,6 +1404,17 @@ export class MealsComponent implements OnInit {
     return list;
   });
 
+  featuredRecipes = computed(() => this.exploreRecipes().slice(0, 5));
+
+  displayedExplore = computed(() => {
+    const q    = this.searchText().toLowerCase().trim();
+    const meal = this.activeFilter();
+    const diet = this.activeDietFilter();
+    const isFiltered = q || meal !== 'All' || diet;
+    if (isFiltered) return this.filteredExplore();
+    return this.showAllExplore() ? this.exploreRecipes() : this.featuredRecipes();
+  });
+
   // ── Lifecycle ─────────────────────────────────────────────
   ngOnInit() {
     if (this.auth.isLoggedIn()) {
@@ -1027,6 +1425,12 @@ export class MealsComponent implements OnInit {
       this.pantryLoading.set(false);
     }
     this.loadExploreRecipes();
+
+    // Debounced AI search: triggers when local results are empty
+    this.searchSubject.pipe(
+      debounceTime(700),
+      distinctUntilChanged(),
+    ).subscribe(q => this.runAiSearch(q));
   }
 
   // ── Data ──────────────────────────────────────────────────
@@ -1056,8 +1460,40 @@ export class MealsComponent implements OnInit {
       });
   }
 
+  private runAiSearch(q: string) {
+    if (!q.trim() || this.filteredExplore().length > 0) {
+      this.aiRecipe.set(null);
+      this.aiSearchLoading.set(false);
+      return;
+    }
+    this.aiSearchLoading.set(true);
+    this.http.get<AiRecipe>(`${environment.apiUrl}/recipes/generate?q=${encodeURIComponent(q)}`)
+      .pipe(catchError(() => of(null)))
+      .subscribe(recipe => {
+        this.aiRecipe.set(recipe);
+        this.aiSearchLoading.set(false);
+      });
+  }
+
   // ── Actions ───────────────────────────────────────────────
   setTab(tab: TabKey) { this.activeTab.set(tab); }
+
+  onSearchChange(q: string) {
+    this.searchText.set(q);
+    this.aiRecipe.set(null);
+    if (!q.trim()) {
+      this.aiSearchLoading.set(false);
+      return;
+    }
+    // Start AI search after debounce
+    this.searchSubject.next(q);
+  }
+
+  clearSearch() {
+    this.searchText.set('');
+    this.aiRecipe.set(null);
+    this.aiSearchLoading.set(false);
+  }
 
   toggleDiet(d: string) {
     this.activeDietFilter.set(this.activeDietFilter() === d ? '' : d);
@@ -1067,12 +1503,16 @@ export class MealsComponent implements OnInit {
     this.searchText.set('');
     this.activeFilter.set('All');
     this.activeDietFilter.set('');
+    this.aiRecipe.set(null);
+    this.aiSearchLoading.set(false);
   }
 
-  openDetail(r: ApiRecipe) { this.detailRecipe.set(r); this.detailOpen.set(true); }
-  closeDetail()             { this.detailOpen.set(false); this.detailRecipe.set(null); }
+  openDetail(r: DetailRecipe) { this.detailRecipe.set(r); this.detailOpen.set(true); }
+  closeDetail()                { this.detailOpen.set(false); this.detailRecipe.set(null); }
 
-  readonly recipeImg = recipeImg;
-  readonly totalMin  = totalMin;
-  readonly diffLabel = diffLabel;
+  readonly recipeImg        = recipeImg;
+  readonly totalMin         = totalMin;
+  readonly diffLabel        = diffLabel;
+  readonly isAiRecipe       = isAiRecipe;
+  readonly parseInstructions = parseInstructions;
 }

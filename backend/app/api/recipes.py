@@ -1,3 +1,5 @@
+import json
+import re
 import uuid
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -11,9 +13,24 @@ from app.core.deps import get_current_user
 from app.models.recipe import Recipe, RecipeIngredient
 from app.models.feedback import SavedRecommendation
 from app.models.user import User, UserPantry
-from app.schemas.recipe import RecipeOut
+from app.schemas.recipe import RecipeOut, GeneratedRecipeOut, AiIngredientOut
+from app.services.embedding_service import get_openai_client
+from app.config import settings
 
 router = APIRouter(prefix="/recipes", tags=["recipes"])
+
+
+def _parse_instructions(raw: Optional[str]) -> List[str]:
+    """Split raw instruction text into a clean list of steps."""
+    if not raw:
+        return []
+    lines = [l.strip() for l in raw.splitlines() if l.strip()]
+    steps = []
+    for line in lines:
+        cleaned = re.sub(r'^(\d+[\.\):\-]\s*|step\s*\d+[\.\):\-]?\s*)', '', line, flags=re.IGNORECASE)
+        if cleaned:
+            steps.append(cleaned)
+    return steps if steps else [raw.strip()]
 
 
 @router.get("", response_model=List[RecipeOut])
@@ -100,6 +117,113 @@ async def list_favourites(
     )
     result = await db.execute(stmt)
     return result.scalars().all()
+
+
+@router.get("/generate", response_model=GeneratedRecipeOut)
+async def generate_recipe(
+    q: str = Query(..., min_length=1, max_length=150),
+    db: AsyncSession = Depends(get_db),
+):
+    """Search DB for a recipe by name; generate one with AI if not found."""
+    q_clean = q.strip()
+
+    result = await db.execute(
+        select(Recipe)
+        .where(Recipe.title.ilike(f"%{q_clean}%"))
+        .options(selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient))
+        .order_by(Recipe.efficacy_score.desc())
+        .limit(1)
+    )
+    recipe = result.scalar_one_or_none()
+
+    if recipe:
+        steps = _parse_instructions(recipe.instructions)
+        ings = [
+            AiIngredientOut(name=ri.ingredient.name, quantity=ri.quantity, unit=ri.unit)
+            for ri in recipe.recipe_ingredients
+            if ri.ingredient
+        ]
+        return GeneratedRecipeOut(
+            id=str(recipe.id),
+            is_ai_generated=False,
+            title=recipe.title,
+            description=recipe.description,
+            prep_time_minutes=recipe.prep_time_minutes,
+            cook_time_minutes=recipe.cook_time_minutes,
+            servings=recipe.servings,
+            meal_type=recipe.meal_type,
+            cuisine_type=recipe.cuisine_type,
+            ingredients=ings,
+            instructions=steps,
+            nutritional_info=recipe.nutritional_info,
+            cooking_tips=[],
+            dietary_labels=recipe.dietary_labels or [],
+            health_benefits=recipe.health_benefits or [],
+            ailment_tags=recipe.ailment_tags or [],
+            image_url=recipe.image_url,
+        )
+
+    # Not found in DB — generate with AI
+    client = get_openai_client()
+    prompt = f"""Generate a complete recipe for "{q_clean}". Return ONLY a JSON object with these exact fields:
+{{
+  "title": "Recipe name",
+  "description": "Brief 1-2 sentence description",
+  "prep_time_minutes": 10,
+  "cook_time_minutes": 20,
+  "servings": 2,
+  "meal_type": "Breakfast or Lunch or Dinner or Snacks or Beverage",
+  "cuisine_type": "e.g. Indian, Italian, Chinese",
+  "ingredients": [
+    {{"name": "ingredient", "quantity": "2", "unit": "cups"}}
+  ],
+  "instructions": [
+    "Heat oil in a pan over medium heat.",
+    "Add onions and cook until golden."
+  ],
+  "nutritional_info": {{
+    "calories": 320,
+    "protein_g": 18,
+    "carbs_g": 30,
+    "fat_g": 12,
+    "fiber_g": 4
+  }},
+  "cooking_tips": ["Tip 1", "Tip 2"],
+  "dietary_labels": ["Vegetarian"],
+  "health_benefits": ["High protein"],
+  "ailment_tags": []
+}}
+Provide realistic values. Instructions: 6-10 complete sentences (no numbering prefix). Keep each step clear."""
+
+    response = await client.chat.completions.create(
+        model=settings.OPENAI_CHAT_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        response_format={"type": "json_object"},
+        temperature=0.3,
+        max_tokens=1200,
+    )
+
+    data = json.loads(response.choices[0].message.content)
+    ings = [AiIngredientOut(**i) for i in data.get("ingredients", [])]
+    return GeneratedRecipeOut(
+        id=None,
+        is_ai_generated=True,
+        title=data.get("title", q_clean),
+        description=data.get("description"),
+        prep_time_minutes=data.get("prep_time_minutes"),
+        cook_time_minutes=data.get("cook_time_minutes"),
+        servings=data.get("servings", 2),
+        meal_type=data.get("meal_type"),
+        cuisine_type=data.get("cuisine_type"),
+        ingredients=ings,
+        instructions=data.get("instructions", []),
+        nutritional_info=data.get("nutritional_info"),
+        cooking_tips=data.get("cooking_tips", []),
+        dietary_labels=data.get("dietary_labels", []),
+        health_benefits=data.get("health_benefits", []),
+        ailment_tags=data.get("ailment_tags", []),
+        image_url=None,
+    )
 
 
 @router.get("/{recipe_id}", response_model=RecipeOut)
