@@ -47,8 +47,8 @@ jobs:
 
             echo "Starting backup → $BACKUP_DIR/$FILENAME"
 
-            sudo docker exec "$DB_CONTAINER" pg_dump \
-              -U "$DB_USER" "$DB_NAME" \
+            sudo docker exec organic_care_db pg_dump \
+              -U organic_user organic_care \
               | gzip > "$BACKUP_DIR/$FILENAME"
 
             SIZE=$(du -sh "$BACKUP_DIR/$FILENAME" | cut -f1)
