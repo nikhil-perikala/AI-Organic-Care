@@ -8,6 +8,7 @@ export interface ApiRecipe {
   id: string;
   title: string;
   description: string | null;
+  instructions: string | null;
   prep_time_minutes: number | null;
   cook_time_minutes: number | null;
   servings: number;
@@ -17,6 +18,7 @@ export interface ApiRecipe {
   health_benefits: string[];
   dietary_labels: string[];
   efficacy_score: number;
+  nutritional_info: Record<string, number> | null;
   image_url: string | null;
   recipe_ingredients: { ingredient: { name: string; category: string | null }; quantity: string | null; unit: string | null }[];
 }
