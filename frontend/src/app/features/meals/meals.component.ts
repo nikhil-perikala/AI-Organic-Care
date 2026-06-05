@@ -7,7 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { FavoritesService, ApiRecipe } from '../../core/services/favorites.service';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
-import { catchError, of, debounceTime, distinctUntilChanged, Subject, switchMap } from 'rxjs';
+import { catchError, of, debounceTime, distinctUntilChanged, Subject } from 'rxjs';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
