@@ -29,6 +29,8 @@ def upgrade() -> None:
         sa.Column("full_name", sa.String(255)),
         sa.Column("is_active", sa.Boolean(), default=True),
         sa.Column("is_verified", sa.Boolean(), default=False),
+        sa.Column("reset_otp_hash", sa.String(255), nullable=True),
+        sa.Column("reset_otp_expires_at", sa.DateTime(), nullable=True),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()")),
         sa.Column("updated_at", sa.DateTime(), server_default=sa.text("NOW()")),
     )
@@ -56,6 +58,8 @@ def upgrade() -> None:
         sa.Column("quantity", sa.String(100)),
         sa.Column("unit", sa.String(50)),
         sa.Column("category", sa.String(100)),
+        sa.Column("expiry_date", sa.Date(), nullable=True),
+        sa.Column("storage_tips", sa.String(500), nullable=True),
         sa.Column("added_at", sa.DateTime(), server_default=sa.text("NOW()")),
     )
 
@@ -183,6 +187,25 @@ def upgrade() -> None:
         sa.Column("saved_at", sa.DateTime(), server_default=sa.text("NOW()")),
     )
 
+    op.create_table(
+        "chat_history",
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")),
+        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE")),
+        sa.Column("role", sa.String(20), nullable=False),
+        sa.Column("content", sa.Text(), nullable=False),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()")),
+    )
+
+    op.create_table(
+        "chat_feedback",
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")),
+        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE")),
+        sa.Column("message_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("chat_history.id", ondelete="CASCADE")),
+        sa.Column("rating", sa.Integer(), nullable=False),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()")),
+        sa.UniqueConstraint("user_id", "message_id", name="uq_chat_feedback_user_msg"),
+    )
+
     # Seed ailment mappings
     op.execute("""
     INSERT INTO ailment_mappings (id, user_term, canonical_ailment, related_ailments, keywords, priority) VALUES
@@ -200,6 +223,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_table("chat_feedback")
+    op.drop_table("chat_history")
     op.drop_table("saved_recommendations")
     op.drop_table("user_feedback")
     op.drop_table("recommendation_sessions")
