@@ -534,12 +534,6 @@ function buildMatches(recipes: ApiRecipe[], pantrySet: Set<string>): PantryMatch
   </div>
   }
 
-  <!-- ══ FLOATING AI BUTTON ══════════════════════════════════ -->
-  <button class="fab" (click)="router.navigate(['/chat'])">
-    <mat-icon style="font-size:19px">smart_toy</mat-icon>
-    <span>Ask AI</span>
-  </button>
-
   <!-- ══ RECIPE DETAIL MODAL ════════════════════════════════ -->
   @if (detailOpen() && detailRecipe(); as r) {
     <div class="detail-backdrop" (click)="closeDetail()">
