@@ -141,6 +141,12 @@ jobs:
             fi
 
             echo "Running database migrations..."
+            # If alembic has no version history (fresh EC2 DB with existing schema),
+            # stamp at 001 so Alembic skips table creation and only applies new migrations.
+            if ! alembic current 2>/dev/null | grep -qE "001|002"; then
+              echo "No Alembic history detected — stamping at 001 (schema already exists)"
+              alembic stamp 001
+            fi
             alembic upgrade head
 
             echo "Restarting backend service..."
