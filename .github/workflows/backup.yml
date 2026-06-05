@@ -2,8 +2,8 @@ name: Daily Backup & SSL Check
 
 on:
   schedule:
-    - cron: '0 2 * * *'   # 2 AM UTC every day
-  workflow_dispatch:       # allow manual trigger any time
+    - cron: '0 2 * * *'
+  workflow_dispatch:
 
 jobs:
   backup:
@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ── 1. Database backup ─────────────────────────────────────────────────
       - name: Backup PostgreSQL on EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -23,25 +22,48 @@ jobs:
             set -euo pipefail
 
             BACKUP_DIR="$HOME/backups"
+            DB_CONTAINER="organic_care_db"
+            DB_USER="organic_user"
+            DB_NAME="organic_care"
+            FILENAME="${DB_NAME}_$(date +%Y-%m-%d_%H%M%S).sql.gz"
+
             mkdir -p "$BACKUP_DIR"
-            FILENAME="organic_care_$(date +%Y-%m-%d_%H%M%S).sql.gz"
+
+            echo "Checking PostgreSQL container..."
+            if ! sudo docker ps --format '{{.Names}}' | grep -qx "$DB_CONTAINER"; then
+              echo "Database container is not running: $DB_CONTAINER"
+
+              if sudo docker ps -a --format '{{.Names}}' | grep -qx "$DB_CONTAINER"; then
+                echo "Starting existing container: $DB_CONTAINER"
+                sudo docker start "$DB_CONTAINER"
+                sleep 8
+              else
+                echo "ERROR: Database container does not exist: $DB_CONTAINER"
+                echo "Available containers:"
+                sudo docker ps -a
+                exit 1
+              fi
+            fi
 
             echo "Starting backup → $BACKUP_DIR/$FILENAME"
-            sudo docker exec organic-care-db pg_dump \
-             -U organic_user organic_care \
+
+            sudo docker exec "$DB_CONTAINER" pg_dump \
+              -U "$DB_USER" "$DB_NAME" \
               | gzip > "$BACKUP_DIR/$FILENAME"
 
             SIZE=$(du -sh "$BACKUP_DIR/$FILENAME" | cut -f1)
             echo "Backup complete: $FILENAME ($SIZE)"
 
-            # Keep only the 7 most recent backups
+            echo "Keeping only latest 7 backups..."
             ls -t "$BACKUP_DIR"/*.sql.gz 2>/dev/null | tail -n +8 | xargs -r rm -f
+
             echo "Retained backups:"
             ls -lh "$BACKUP_DIR"/*.sql.gz
 
-      # ── 2. SSL certificate expiry check ───────────────────────────────────
       - name: Check SSL cert expiry
         run: |
+          set -euo pipefail
+
           DOMAIN="organic-care-api.duckdns.org"
           echo "Checking SSL cert for $DOMAIN ..."
 
