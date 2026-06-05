@@ -9,9 +9,10 @@ _email = lambda: f"auth_{uuid.uuid4().hex[:8]}@test.organiccare"
 # ── Register ──────────────────────────────────────────────────────────────────
 
 async def test_register_success(client):
-    resp = await client.post("/api/v1/auth/register", json={
-        "email": _email(), "password": TEST_PASSWORD, "full_name": "Alice",
-    })
+    with patch("app.api.auth.send_otp_email", new_callable=AsyncMock):
+        resp = await client.post("/api/v1/auth/register", json={
+            "email": _email(), "password": TEST_PASSWORD, "full_name": "Alice",
+        })
     assert resp.status_code == 201
     data = resp.json()
     assert "id" in data
