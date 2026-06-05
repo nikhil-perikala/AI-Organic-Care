@@ -33,8 +33,9 @@ def upgrade() -> None:
         sa.Column("reset_otp_expires_at", sa.DateTime(), nullable=True),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()")),
         sa.Column("updated_at", sa.DateTime(), server_default=sa.text("NOW()")),
+        if_not_exists=True,
     )
-    op.create_index("ix_users_email", "users", ["email"])
+    op.create_index("ix_users_email", "users", ["email"], if_not_exists=True)
 
     op.create_table(
         "user_profiles",
@@ -48,6 +49,7 @@ def upgrade() -> None:
         sa.Column("serving_size", sa.Integer(), default=2),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()")),
         sa.Column("updated_at", sa.DateTime(), server_default=sa.text("NOW()")),
+        if_not_exists=True,
     )
 
     op.create_table(
@@ -61,6 +63,7 @@ def upgrade() -> None:
         sa.Column("expiry_date", sa.Date(), nullable=True),
         sa.Column("storage_tips", sa.String(500), nullable=True),
         sa.Column("added_at", sa.DateTime(), server_default=sa.text("NOW()")),
+        if_not_exists=True,
     )
 
     op.create_table(
@@ -75,8 +78,9 @@ def upgrade() -> None:
         sa.Column("is_organic", sa.Boolean(), default=False),
         sa.Column("usda_food_id", sa.String(100)),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()")),
+        if_not_exists=True,
     )
-    op.create_index("ix_ingredients_name", "ingredients", ["name"])
+    op.create_index("ix_ingredients_name", "ingredients", ["name"], if_not_exists=True)
 
     op.create_table(
         "recipes",
@@ -99,10 +103,11 @@ def upgrade() -> None:
         sa.Column("embedding", Vector(1536)),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()")),
         sa.Column("updated_at", sa.DateTime(), server_default=sa.text("NOW()")),
+        if_not_exists=True,
     )
-    op.create_index("ix_recipes_title", "recipes", ["title"])
+    op.create_index("ix_recipes_title", "recipes", ["title"], if_not_exists=True)
     op.execute("""
-        CREATE INDEX ix_recipe_embedding_hnsw ON recipes
+        CREATE INDEX IF NOT EXISTS ix_recipe_embedding_hnsw ON recipes
         USING hnsw (embedding vector_cosine_ops)
         WITH (m = 16, ef_construction = 64)
     """)
@@ -116,6 +121,7 @@ def upgrade() -> None:
         sa.Column("unit", sa.String(50)),
         sa.Column("notes", sa.String(255)),
         sa.Column("is_optional", sa.Boolean(), default=False),
+        if_not_exists=True,
     )
 
     op.create_table(
@@ -135,9 +141,10 @@ def upgrade() -> None:
         sa.Column("token_count", sa.Integer()),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()")),
         sa.Column("ingestion_run_id", sa.String(100)),
+        if_not_exists=True,
     )
     op.execute("""
-        CREATE INDEX ix_knowledge_embedding_hnsw ON knowledge_chunks
+        CREATE INDEX IF NOT EXISTS ix_knowledge_embedding_hnsw ON knowledge_chunks
         USING hnsw (embedding vector_cosine_ops)
         WITH (m = 16, ef_construction = 64)
     """)
@@ -151,8 +158,9 @@ def upgrade() -> None:
         sa.Column("beneficial_nutrients", postgresql.JSON()),
         sa.Column("keywords", postgresql.JSON()),
         sa.Column("priority", sa.Integer(), default=5),
+        if_not_exists=True,
     )
-    op.create_index("ix_ailment_mappings_user_term", "ailment_mappings", ["user_term"])
+    op.create_index("ix_ailment_mappings_user_term", "ailment_mappings", ["user_term"], if_not_exists=True)
 
     op.create_table(
         "recommendation_sessions",
@@ -165,6 +173,7 @@ def upgrade() -> None:
         sa.Column("ai_explanation", sa.Text()),
         sa.Column("latency_ms", sa.Integer()),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()")),
+        if_not_exists=True,
     )
 
     op.create_table(
@@ -176,6 +185,7 @@ def upgrade() -> None:
         sa.Column("feedback_type", sa.String(20), nullable=False),
         sa.Column("comment", sa.Text()),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()")),
+        if_not_exists=True,
     )
 
     op.create_table(
@@ -185,6 +195,7 @@ def upgrade() -> None:
         sa.Column("recipe_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("recipes.id", ondelete="CASCADE")),
         sa.Column("notes", sa.Text()),
         sa.Column("saved_at", sa.DateTime(), server_default=sa.text("NOW()")),
+        if_not_exists=True,
     )
 
     op.create_table(
@@ -194,6 +205,7 @@ def upgrade() -> None:
         sa.Column("role", sa.String(20), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()")),
+        if_not_exists=True,
     )
 
     op.create_table(
@@ -204,35 +216,40 @@ def upgrade() -> None:
         sa.Column("rating", sa.Integer(), nullable=False),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()")),
         sa.UniqueConstraint("user_id", "message_id", name="uq_chat_feedback_user_msg"),
+        if_not_exists=True,
     )
 
-    # Seed ailment mappings
+    # Seed ailment mappings (INSERT … ON CONFLICT DO NOTHING = idempotent)
     op.execute("""
-    INSERT INTO ailment_mappings (id, user_term, canonical_ailment, related_ailments, keywords, priority) VALUES
-    (uuid_generate_v4(), 'tired', 'fatigue', '["low energy", "exhaustion"]', '["tired", "exhausted", "no energy", "sluggish", "fatigue", "worn out"]', 9),
-    (uuid_generate_v4(), 'stressed', 'stress', '["anxiety", "overwhelmed"]', '["stressed", "anxious", "overwhelmed", "tense", "nervous", "stress"]', 9),
-    (uuid_generate_v4(), 'bloated', 'bloating', '["digestive issues", "gas"]', '["bloated", "bloating", "gassy", "stomach pain", "distended"]', 8),
-    (uuid_generate_v4(), 'can''t sleep', 'insomnia', '["sleep issues", "fatigue"]', '["can''t sleep", "insomnia", "sleepless", "sleep better", "sleep", "awake at night"]', 9),
-    (uuid_generate_v4(), 'fighting a cold', 'immune support', '["illness", "infection"]', '["cold", "flu", "sick", "fighting a cold", "immune", "sneezing", "runny nose"]', 8),
-    (uuid_generate_v4(), 'headache', 'headache', '["migraine", "stress"]', '["headache", "migraine", "head pain", "tension headache"]', 7),
-    (uuid_generate_v4(), 'gut issues', 'gut health', '["digestive issues", "bloating"]', '["gut", "digestion", "ibs", "constipation", "diarrhea", "stomach"]', 8),
-    (uuid_generate_v4(), 'inflammation', 'inflammation', '["joint pain", "arthritis"]', '["inflamed", "inflammation", "swollen", "joint pain", "arthritis"]', 8),
-    (uuid_generate_v4(), 'brain fog', 'cognitive function', '["focus", "memory"]', '["brain fog", "focus", "concentration", "memory", "clarity", "think clearly"]', 7),
-    (uuid_generate_v4(), 'weight loss', 'weight management', '["metabolism", "obesity"]', '["weight loss", "lose weight", "slim", "metabolism", "fat burning"]', 7)
+    INSERT INTO ailment_mappings (id, user_term, canonical_ailment, related_ailments, keywords, priority)
+    SELECT uuid_generate_v4(), user_term, canonical_ailment, related_ailments::json, keywords::json, priority
+    FROM (VALUES
+        ('tired',           'fatigue',            '["low energy", "exhaustion"]',       '["tired", "exhausted", "no energy", "sluggish", "fatigue", "worn out"]', 9),
+        ('stressed',        'stress',             '["anxiety", "overwhelmed"]',          '["stressed", "anxious", "overwhelmed", "tense", "nervous", "stress"]', 9),
+        ('bloated',         'bloating',           '["digestive issues", "gas"]',         '["bloated", "bloating", "gassy", "stomach pain", "distended"]', 8),
+        ('can''t sleep',    'insomnia',           '["sleep issues", "fatigue"]',         '["can''t sleep", "insomnia", "sleepless", "sleep better", "sleep", "awake at night"]', 9),
+        ('fighting a cold', 'immune support',     '["illness", "infection"]',            '["cold", "flu", "sick", "fighting a cold", "immune", "sneezing", "runny nose"]', 8),
+        ('headache',        'headache',           '["migraine", "stress"]',              '["headache", "migraine", "head pain", "tension headache"]', 7),
+        ('gut issues',      'gut health',         '["digestive issues", "bloating"]',    '["gut", "digestion", "ibs", "constipation", "diarrhea", "stomach"]', 8),
+        ('inflammation',    'inflammation',       '["joint pain", "arthritis"]',         '["inflamed", "inflammation", "swollen", "joint pain", "arthritis"]', 8),
+        ('brain fog',       'cognitive function', '["focus", "memory"]',                '["brain fog", "focus", "concentration", "memory", "clarity", "think clearly"]', 7),
+        ('weight loss',     'weight management',  '["metabolism", "obesity"]',           '["weight loss", "lose weight", "slim", "metabolism", "fat burning"]', 7)
+    ) AS t(user_term, canonical_ailment, related_ailments, keywords, priority)
+    WHERE NOT EXISTS (SELECT 1 FROM ailment_mappings WHERE ailment_mappings.user_term = t.user_term)
     """)
 
 
 def downgrade() -> None:
-    op.drop_table("chat_feedback")
-    op.drop_table("chat_history")
-    op.drop_table("saved_recommendations")
-    op.drop_table("user_feedback")
-    op.drop_table("recommendation_sessions")
-    op.drop_table("ailment_mappings")
-    op.drop_table("knowledge_chunks")
-    op.drop_table("recipe_ingredients")
-    op.drop_table("recipes")
-    op.drop_table("ingredients")
-    op.drop_table("user_pantry")
-    op.drop_table("user_profiles")
-    op.drop_table("users")
+    op.drop_table("chat_feedback", if_exists=True)
+    op.drop_table("chat_history", if_exists=True)
+    op.drop_table("saved_recommendations", if_exists=True)
+    op.drop_table("user_feedback", if_exists=True)
+    op.drop_table("recommendation_sessions", if_exists=True)
+    op.drop_table("ailment_mappings", if_exists=True)
+    op.drop_table("knowledge_chunks", if_exists=True)
+    op.drop_table("recipe_ingredients", if_exists=True)
+    op.drop_table("recipes", if_exists=True)
+    op.drop_table("ingredients", if_exists=True)
+    op.drop_table("user_pantry", if_exists=True)
+    op.drop_table("user_profiles", if_exists=True)
+    op.drop_table("users", if_exists=True)
