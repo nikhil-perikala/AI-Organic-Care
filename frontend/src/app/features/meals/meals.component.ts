@@ -103,33 +103,23 @@ function parseInstructions(raw: string | null | undefined): string[] {
           <a routerLink="/auth/login" class="primary-btn">Sign In</a>
         </div>
       </div>
-    }
-
-    <!-- Loading -->
-    @else if (pantryLoading()) {
+    } @else if (pantryLoading()) {
       <div class="pane">
         <div class="loading-box">
           <i class="ti ti-loader-2 spin"></i>
           <span>Loading your pantry…</span>
         </div>
       </div>
-    }
-
-    <!-- Detail view -->
-    @else if (pantryDetail()) {
+    } @else if (pantryDetail()) {
       <div class="pane detail-pane">
         <button class="back-detail" (click)="pantryDetail.set(null)">
           <i class="ti ti-arrow-left"></i> Back to Recipes
         </button>
         <ng-container *ngTemplateOutlet="apiDetail; context: { r: pantryDetail() }"></ng-container>
       </div>
-    }
-
-    <!-- List view -->
-    @else {
+    } @else {
       <div class="pane">
-
-        <!-- Empty pantry -->
+        <!-- Pantry list -->
         @if (pantryItems().length === 0) {
           <div class="empty-state">
             <i class="ti ti-basket empty-ico"></i>
@@ -239,10 +229,7 @@ function parseInstructions(raw: string | null | undefined): string[] {
           <ng-container *ngTemplateOutlet="genDetail; context: { r: exploreDetail()!.recipe }"></ng-container>
         }
       </div>
-    }
-
-    <!-- List + search view -->
-    @else {
+    } @else {
       <div class="pane">
 
         <!-- Search bar -->
@@ -300,10 +287,7 @@ function parseInstructions(raw: string | null | undefined): string[] {
               </div>
             }
           </div>
-        }
-
-        <!-- Featured recipe cards -->
-        @else if (!searchLoading()) {
+        } @else if (!searchLoading()) {
           <div class="recipe-list mt-2">
             @for (r of featuredRecipes(); track r.id) {
               <div class="recipe-card" (click)="openFeaturedDetail(r)">
