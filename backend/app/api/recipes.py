@@ -3,11 +3,11 @@ import re
 import uuid
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, cast
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import selectinload
-
 from app.database import get_db
 from app.core.deps import get_current_user
 from app.models.recipe import Recipe, RecipeIngredient
@@ -18,6 +18,16 @@ from app.services.embedding_service import get_openai_client
 from app.config import settings
 
 router = APIRouter(prefix="/recipes", tags=["recipes"])
+
+
+class PantryRecipeRequest(BaseModel):
+    ingredients: List[str]
+
+
+def _extract_json(text: str):
+    """Strip markdown fences and parse JSON."""
+    text = re.sub(r"```(?:json)?\n?", "", text).strip().rstrip("`").strip()
+    return json.loads(text)
 
 
 def _parse_instructions(raw: Optional[str]) -> List[str]:
@@ -224,6 +234,89 @@ Provide realistic values. Instructions: 6-10 complete sentences (no numbering pr
         ailment_tags=data.get("ailment_tags", []),
         image_url=None,
     )
+
+
+@router.post("/claude-pantry")
+async def claude_pantry_recipes(request: PantryRecipeRequest):
+    """Generate 3 recipes from a user-supplied ingredient list using OpenAI."""
+    if not request.ingredients:
+        raise HTTPException(status_code=400, detail="No ingredients provided")
+
+    ing_str = ", ".join(request.ingredients)
+    prompt = f"""I have these ingredients: {ing_str}
+
+Generate exactly 3 recipes using only these ingredients (common staples like salt, pepper, oil are fine).
+Return ONLY a valid JSON array of exactly 3 objects — no markdown, no backticks, no extra text.
+[
+  {{
+    "name": "Recipe Name",
+    "time": 25,
+    "match": 80,
+    "ingredients": ["2 eggs", "1 clove garlic, minced"],
+    "steps": ["Heat oil in a pan.", "Add garlic and cook 1 minute."],
+    "icon": "egg"
+  }}
+]
+Rules:
+- "time": total cook+prep minutes as integer
+- "match": % of required ingredients covered by the provided list (0-100 integer)
+- "ingredients": complete list with quantities as plain strings
+- "steps": 4-6 clear cooking steps as strings
+- "icon": single word from: egg, meat, fish, leaf, salad, soup, pizza, bread, flame, carrot"""
+
+    try:
+        client = get_openai_client()
+        response = await client.chat.completions.create(
+            model=settings.OPENAI_CHAT_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0.5,
+            max_tokens=1500,
+        )
+        raw = response.choices[0].message.content or "[]"
+        data = json.loads(raw)
+        # OpenAI json_object always returns an object; unwrap if needed
+        if isinstance(data, dict):
+            data = data.get("recipes", list(data.values())[0] if data else [])
+        return data[:3]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Recipe generation failed: {e}")
+
+
+@router.get("/claude-explore")
+async def claude_explore_recipe(q: str = Query(..., min_length=1, max_length=200)):
+    """Generate a single recipe for any query using OpenAI."""
+    prompt = f"""Generate a complete recipe for: {q}
+
+Return ONLY a valid JSON object — no markdown, no backticks, no extra text.
+{{
+  "name": "Recipe Name",
+  "time": 30,
+  "servings": 2,
+  "ingredients": ["2 eggs", "1 onion, diced"],
+  "steps": ["Step one.", "Step two."],
+  "tip": "One useful chef's tip."
+}}
+Rules:
+- "time": total time in minutes as integer
+- "servings": number as integer
+- "ingredients": complete list with quantities as plain strings
+- "steps": 5-7 clear cooking instructions
+- "tip": one practical cooking tip"""
+
+    try:
+        client = get_openai_client()
+        response = await client.chat.completions.create(
+            model=settings.OPENAI_CHAT_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0.4,
+            max_tokens=1200,
+        )
+        raw = response.choices[0].message.content or "{}"
+        return json.loads(raw)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Recipe generation failed: {e}")
 
 
 @router.get("/{recipe_id}", response_model=RecipeOut)
