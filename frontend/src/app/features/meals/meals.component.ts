@@ -534,18 +534,18 @@ function parseInstructions(raw: string | null | undefined): string[] {
   styles: [`
     /* ── CSS variables ──────────────────────────────────────────────────────── */
     :host {
-      --bg:         #f8fafc;
+      --bg:         #f4faf4;
       --surface:    #ffffff;
-      --surface-2:  #f1f5f9;
-      --text:       #0f172a;
-      --text-muted: #64748b;
-      --border:     #e2e8f0;
-      --info:       #0ea5e9;
-      --info-light: #e0f2fe;
-      --info-dark:  #0284c7;
-      --green:      #16a34a;
-      --green-light:#dcfce7;
-      --amber:      #f59e0b;
+      --surface-2:  #f1f8f1;
+      --text:       #1a2a1a;
+      --text-muted: #6b7c6b;
+      --border:     #d4e6d4;
+      --info:       #2e7d32;
+      --info-light: #e8f5e9;
+      --info-dark:  #1b5e20;
+      --green:      #2e7d32;
+      --green-light:#e8f5e9;
+      --amber:      #f57c00;
       --radius:     12px;
       --shadow:     0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
       --shadow-md:  0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.05);
@@ -554,9 +554,9 @@ function parseInstructions(raw: string | null | undefined): string[] {
     }
     @media (prefers-color-scheme: dark) {
       :host {
-        --bg: #0f172a; --surface: #1e293b; --surface-2: #263548;
-        --text: #f1f5f9; --text-muted: #94a3b8; --border: #334155;
-        --info-light: #0c4a6e; --info-dark: #7dd3fc; --green-light: #052e16;
+        --bg: #0a1a0a; --surface: #1a2a1a; --surface-2: #243324;
+        --text: #e8f5e9; --text-muted: #a5d6a7; --border: #2e4a2e;
+        --info-light: #1b3a1b; --info-dark: #81c784; --green-light: #1b3a1b;
       }
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -645,7 +645,7 @@ function parseInstructions(raw: string | null | undefined): string[] {
     /* ── Insight bar ─────────────────────────────────────────────────────────── */
     .insight-bar {
       display: flex; align-items: center; gap: 12px;
-      background: linear-gradient(135deg, #0c4a6e, #0369a1, #0284c7);
+      background: linear-gradient(135deg, #1b5e20, #2e7d32, #43a047);
       border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow-md);
     }
     .insight-ico { font-size: 22px; color: #fff; flex-shrink: 0; }
@@ -787,11 +787,11 @@ function parseInstructions(raw: string | null | undefined): string[] {
     .nutr-card { flex: 1; min-width: 60px; border-radius: 12px; padding: 10px 8px; text-align: center; }
     .nutr-val   { font-size: 16px; font-weight: 800; color: var(--text); }
     .nutr-label { font-size: 10px; font-weight: 500; color: var(--text-muted); margin-top: 2px; }
-    .nutr-cal  { background: #fff3e0; }
-    .nutr-pro  { background: #dcfce7; }
-    .nutr-carb { background: #eff6ff; }
-    .nutr-fat  { background: #fce7f3; }
-    .nutr-fib  { background: #f5f3ff; }
+    .nutr-cal  { background: #fff8e1; }
+    .nutr-pro  { background: #e8f5e9; }
+    .nutr-carb { background: #e8f5e9; }
+    .nutr-fat  { background: #fff3e0; }
+    .nutr-fib  { background: #f1f8e9; }
 
     /* ── Ingredients list ────────────────────────────────────────────────────── */
     .ing-list { list-style: none; display: flex; flex-direction: column; gap: 7px; }
