@@ -6,13 +6,14 @@ import { RouterLink } from '@angular/router';
 import { catchError, of } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/services/auth.service';
-import { ApiRecipe } from '../../core/services/favorites.service';
+import { ApiRecipe, FavoritesService } from '../../core/services/favorites.service';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface PantryItem { id: string; ingredient_name: string; }
 
 interface RecipeDetail {
+  id: string | null;
   title: string;
   description: string | null;
   prep_time_minutes: number | null;
@@ -57,6 +58,7 @@ function parseInstructions(raw: string | null | undefined): string[] {
 
 function apiToDetail(r: ApiRecipe): RecipeDetail {
   return {
+    id: r.id,
     title: r.title,
     description: r.description,
     prep_time_minutes: r.prep_time_minutes,
@@ -75,6 +77,7 @@ function apiToDetail(r: ApiRecipe): RecipeDetail {
 
 function genToDetail(r: any): RecipeDetail {
   return {
+    id: r.id ?? null,
     title: r.title,
     description: r.description ?? null,
     prep_time_minutes: r.prep_time_minutes ?? null,
@@ -88,6 +91,24 @@ function genToDetail(r: any): RecipeDetail {
     nutritional_info: r.nutritional_info ?? null,
     cooking_tips: r.cooking_tips ?? [],
     is_ai_generated: !!r.is_ai_generated,
+  };
+}
+
+// Converts the /claude-pantry response format into RecipeDetail
+function claudeCardToDetail(r: any): RecipeDetail {
+  return {
+    id: null,
+    title: r.name ?? 'Recipe',
+    description: null,
+    prep_time_minutes: Math.round((r.time ?? 30) / 2),
+    cook_time_minutes: Math.round((r.time ?? 30) / 2),
+    servings: 2,
+    cuisine_type: null,
+    ingredients: (r.ingredients ?? []).map((s: string) => ({ label: s })),
+    instructions: r.steps ?? [],
+    nutritional_info: null,
+    cooking_tips: [],
+    is_ai_generated: true,
   };
 }
 
@@ -121,7 +142,6 @@ function genToDetail(r: any): RecipeDetail {
 
     @if (pantryDetail()) {
 
-      <!-- Pantry detail -->
       <div class="pane">
         <button class="back-detail" (click)="pantryDetail.set(null)">
           <i class="ti ti-arrow-left"></i> Back to Recipes
@@ -150,44 +170,86 @@ function genToDetail(r: any): RecipeDetail {
         </div>
       </div>
 
-    } @else if (pantryMatches().length === 0) {
+    } @else if (pantryMatches().length === 0 && pantryAiRecipes().length === 0 && pantryItems().length === 0) {
 
       <div class="pane">
         <div class="empty-state">
           <i class="ti ti-basket empty-ico"></i>
-          <h3>No recipes found</h3>
-          <p>Add more ingredients to your pantry to get personalised recipe suggestions.</p>
+          <h3>Your pantry is empty</h3>
+          <p>Add ingredients to your pantry to get personalised recipe suggestions.</p>
           <a routerLink="/pantry" class="primary-btn">Add Pantry Items</a>
+        </div>
+      </div>
+
+    } @else if (pantryMatches().length === 0 && pantryAiRecipes().length === 0) {
+
+      <div class="pane">
+        <div class="empty-state">
+          <i class="ti ti-basket empty-ico"></i>
+          <h3>No matches found</h3>
+          <p>Your pantry items didn't match any recipes in our database. Generating AI suggestions…</p>
+          <div class="loading-box mt-4" style="justify-content:center">
+            <i class="ti ti-loader-2 spin"></i>
+          </div>
         </div>
       </div>
 
     } @else {
 
       <div class="pane">
-        <div class="section-label">
-          <i class="ti ti-sparkles"></i> {{ pantryMatches().length }} recipes from your pantry
-        </div>
-        <div class="card-list mt-2">
-          @for (m of pantryMatches(); track m.recipe.id) {
-            <div class="recipe-card" (click)="openPantryDetail(m.recipe)">
-              <div class="card-icon"><i class="ti ti-bowl-chopsticks"></i></div>
-              <div class="card-body">
-                <div class="card-name">{{ m.recipe.title }}</div>
-                <div class="card-meta">
-                  @if (recipeTime(m.recipe) > 0) {
-                    <span><i class="ti ti-clock"></i> {{ recipeTime(m.recipe) }} min</span>
-                  }
-                  <span><i class="ti ti-chart-bar"></i> {{ diff(m.recipe) }}</span>
+
+        <!-- DB recipes from pantry -->
+        @if (pantryMatches().length > 0) {
+          <div class="section-label">
+            <i class="ti ti-sparkles"></i> {{ pantryMatches().length }} recipes from your pantry
+          </div>
+          <div class="card-list mt-2">
+            @for (m of pantryMatches(); track m.recipe.id) {
+              <div class="recipe-card" (click)="openPantryDetail(m.recipe)">
+                <div class="card-icon"><i class="ti ti-bowl-chopsticks"></i></div>
+                <div class="card-body">
+                  <div class="card-name">{{ m.recipe.title }}</div>
+                  <div class="card-meta">
+                    @if (recipeTime(m.recipe) > 0) {
+                      <span><i class="ti ti-clock"></i> {{ recipeTime(m.recipe) }} min</span>
+                    }
+                    <span><i class="ti ti-chart-bar"></i> {{ diff(m.recipe) }}</span>
+                  </div>
                 </div>
+                <span class="match-badge"
+                  [class.match-high]="m.matchPct >= 80"
+                  [class.match-mid]="m.matchPct >= 50 && m.matchPct < 80">
+                  {{ m.matchPct }}%
+                </span>
               </div>
-              <span class="match-badge"
-                [class.match-high]="m.matchPct >= 80"
-                [class.match-mid]="m.matchPct >= 50 && m.matchPct < 80">
-                {{ m.matchPct }}%
-              </span>
-            </div>
-          }
-        </div>
+            }
+          </div>
+        }
+
+        <!-- AI fallback recipes when DB has no matches -->
+        @if (pantryAiRecipes().length > 0) {
+          <div class="section-label" [class.mt-4]="pantryMatches().length > 0">
+            <i class="ti ti-robot"></i> AI suggestions from your pantry
+          </div>
+          <div class="card-list mt-2">
+            @for (r of pantryAiRecipes(); track r.name) {
+              <div class="recipe-card" (click)="openAiPantryDetail(r)">
+                <div class="card-icon"><i class="ti ti-{{ r.icon || 'bowl-chopsticks' }}"></i></div>
+                <div class="card-body">
+                  <div class="card-name">{{ r.name }}</div>
+                  <div class="card-meta">
+                    <span><i class="ti ti-clock"></i> {{ r.time }} min</span>
+                    <span class="ai-tag"><i class="ti ti-sparkles"></i> AI</span>
+                  </div>
+                </div>
+                <span class="match-badge" [class.match-high]="r.match >= 80" [class.match-mid]="r.match >= 50 && r.match < 80">
+                  {{ r.match }}%
+                </span>
+              </div>
+            }
+          </div>
+        }
+
       </div>
 
     }
@@ -198,7 +260,6 @@ function genToDetail(r: any): RecipeDetail {
 
     @if (exploreDetail()) {
 
-      <!-- Explore detail -->
       <div class="pane">
         <button class="back-detail" (click)="exploreDetail.set(null)">
           <i class="ti ti-arrow-left"></i> Back to Recipes
@@ -226,7 +287,6 @@ function genToDetail(r: any): RecipeDetail {
           }
         </div>
 
-        <!-- Search loading -->
         @if (searchLoading()) {
           <div class="loading-box mt-4">
             <i class="ti ti-loader-2 spin"></i>
@@ -234,14 +294,12 @@ function genToDetail(r: any): RecipeDetail {
           </div>
         }
 
-        <!-- Search error -->
         @if (searchError && !searchLoading()) {
           <div class="error-msg mt-3">
             <i class="ti ti-alert-circle"></i> Could not find that recipe. Try a different name.
           </div>
         }
 
-        <!-- Default 5 recipes -->
         @if (!searchLoading()) {
           <div class="section-label mt-4">
             <i class="ti ti-star"></i> Popular Recipes
@@ -277,9 +335,20 @@ function genToDetail(r: any): RecipeDetail {
         <i class="ti ti-bowl-chopsticks detail-main-icon"></i>
       </div>
       <h2 class="detail-name">{{ r.title }}</h2>
-      @if (r.is_ai_generated) {
-        <span class="ai-badge"><i class="ti ti-sparkles"></i> AI Generated</span>
-      }
+      <div class="detail-header-row">
+        @if (r.is_ai_generated) {
+          <span class="ai-badge"><i class="ti ti-sparkles"></i> AI Generated</span>
+        }
+        @if (!r.is_ai_generated && r.id) {
+          <button class="save-btn"
+            [class.save-btn-saved]="favs.favouriteIds().has(r.id)"
+            (click)="toggleSave(r)">
+            <i class="ti" [class.ti-heart]="!favs.favouriteIds().has(r.id)"
+                          [class.ti-heart-filled]="favs.favouriteIds().has(r.id)"></i>
+            {{ favs.favouriteIds().has(r.id) ? 'Saved' : 'Save Recipe' }}
+          </button>
+        }
+      </div>
       <div class="detail-chips">
         @if (totalMin(r.prep_time_minutes, r.cook_time_minutes) > 0) {
           <span class="d-chip">
@@ -494,6 +563,7 @@ function genToDetail(r: any): RecipeDetail {
     .card-name { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 5px; }
     .card-meta { display: flex; gap: 12px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
     .card-meta span { display: flex; align-items: center; gap: 4px; }
+    .ai-tag { color: #7c3aed !important; font-weight: 600; }
 
     .match-badge {
       padding: 5px 11px; border-radius: 100px; font-size: 12px; font-weight: 700;
@@ -545,12 +615,30 @@ function genToDetail(r: any): RecipeDetail {
     }
     .detail-main-icon { font-size: 34px; color: var(--green); }
     .detail-name { font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 10px; }
+
+    .detail-header-row {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      margin-bottom: 10px; flex-wrap: wrap;
+    }
     .ai-badge {
-      display: inline-flex; align-items: center; gap: 5px; margin-bottom: 10px;
+      display: inline-flex; align-items: center; gap: 5px;
       padding: 4px 12px; border-radius: 100px;
       background: linear-gradient(135deg, #6d28d9, #9333ea);
       color: #fff; font-size: 12px; font-weight: 600;
     }
+
+    /* Save button */
+    .save-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 16px; border-radius: 100px;
+      border: 1.5px solid var(--border); background: var(--surface);
+      color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .save-btn:hover { border-color: #e11d48; color: #e11d48; }
+    .save-btn.save-btn-saved { background: #fef2f2; border-color: #e11d48; color: #e11d48; }
+    .save-btn i { font-size: 16px; }
+
     .detail-chips { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
     .d-chip {
       display: inline-flex; align-items: center; gap: 5px;
@@ -621,14 +709,16 @@ function genToDetail(r: any): RecipeDetail {
 export class MealsComponent implements OnInit {
   private http = inject(HttpClient);
   auth = inject(AuthService);
+  favs = inject(FavoritesService);
 
   activeTab = signal<'pantry' | 'explore'>('pantry');
 
   // ── Pantry ────────────────────────────────────────────────────────────────
-  pantryItems   = signal<PantryItem[]>([]);
-  pantryRecipes = signal<ApiRecipe[]>([]);
-  pantryLoading = signal(true);
-  pantryDetail  = signal<RecipeDetail | null>(null);
+  pantryItems    = signal<PantryItem[]>([]);
+  pantryRecipes  = signal<ApiRecipe[]>([]);
+  pantryLoading  = signal(true);
+  pantryDetail   = signal<RecipeDetail | null>(null);
+  pantryAiRecipes = signal<any[]>([]);
 
   pantryMatches = computed(() => {
     const names = new Set(this.pantryItems().map(p => p.ingredient_name.toLowerCase()));
@@ -645,7 +735,7 @@ export class MealsComponent implements OnInit {
   });
 
   // ── Explore ───────────────────────────────────────────────────────────────
-  searchQuery  = '';
+  searchQuery   = '';
   searchFocused = false;
   searchLoading = signal(false);
   searchError   = false;
@@ -656,6 +746,7 @@ export class MealsComponent implements OnInit {
   // ── Lifecycle ────────────────────────────────────────────────────────────
   ngOnInit() {
     if (this.auth.isLoggedIn()) {
+      this.favs.load();
       this.loadPantry();
     } else {
       this.pantryLoading.set(false);
@@ -674,10 +765,24 @@ export class MealsComponent implements OnInit {
             .subscribe(recipes => {
               this.pantryRecipes.set(recipes);
               this.pantryLoading.set(false);
+              // If no DB matches, fall back to AI-generated suggestions
+              if (recipes.length === 0) {
+                this.loadPantryAiFallback(items);
+              }
             });
         } else {
           this.pantryLoading.set(false);
         }
+      });
+  }
+
+  private loadPantryAiFallback(items: PantryItem[]) {
+    const ingredients = items.slice(0, 15).map(p => p.ingredient_name);
+    this.http.post<any>(`${environment.apiUrl}/recipes/claude-pantry`, { ingredients })
+      .pipe(catchError(() => of({ recipes: [] })))
+      .subscribe(data => {
+        const list = Array.isArray(data) ? data : (data?.recipes ?? []);
+        this.pantryAiRecipes.set(list.slice(0, 3));
       });
   }
 
@@ -690,6 +795,10 @@ export class MealsComponent implements OnInit {
 
   openPantryDetail(r: ApiRecipe) {
     this.pantryDetail.set(apiToDetail(r));
+  }
+
+  openAiPantryDetail(r: any) {
+    this.pantryDetail.set(claudeCardToDetail(r));
   }
 
   fetchAndShowDetail(title: string) {
@@ -713,6 +822,13 @@ export class MealsComponent implements OnInit {
     const q = this.searchQuery.trim();
     if (!q) return;
     this.fetchAndShowDetail(q);
+  }
+
+  toggleSave(r: RecipeDetail) {
+    if (!r.id) return;
+    // Build a minimal ApiRecipe to pass to the toggle (for optimistic UI)
+    const asApiRecipe = { id: r.id } as ApiRecipe;
+    this.favs.toggle(r.id, asApiRecipe);
   }
 
   // Helpers exposed to template

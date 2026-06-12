@@ -40,11 +40,10 @@ interface DayPlan {
 
 const STOP = new Set(['and','the','with','for','from','made','easy','quick','healthy','organic','fresh','style']);
 
-function mealImg(title: string, mealType: string | null): string {
-  const w = title.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/)
-    .filter(x => x.length > 3 && !STOP.has(x)).slice(0, 2);
-  const q = w.length ? w.join(',') : (mealType ?? 'food');
-  return `https://source.unsplash.com/featured/400x300/?food,${encodeURIComponent(q)}`;
+function mealImg(title: string, _mealType: string | null): string {
+  // picsum gives a deterministic photo per seed — no API key needed, always loads
+  const seed = encodeURIComponent(title.toLowerCase().replace(/\s+/g, '-'));
+  return `https://picsum.photos/seed/${seed}/400/300`;
 }
 
 function hasPantry(name: string, pantry: string[]): boolean {

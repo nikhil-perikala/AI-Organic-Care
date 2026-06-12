@@ -313,7 +313,10 @@ Instructions must be 7–10 complete, detailed sentences — no numbering prefix
         max_tokens=1600,
     )
 
-    data = json.loads(response.choices[0].message.content)
+    try:
+        data = json.loads(response.choices[0].message.content or "{}")
+    except (json.JSONDecodeError, AttributeError):
+        raise HTTPException(status_code=502, detail="AI returned an invalid response. Please try again.")
     ings = [AiIngredientOut(**i) for i in data.get("ingredients", [])]
     return GeneratedRecipeOut(
         id=None,
