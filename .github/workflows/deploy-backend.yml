@@ -49,7 +49,7 @@ jobs:
       REFRESH_TOKEN_EXPIRE_DAYS: 7
       OPENAI_API_KEY: sk-placeholder-not-called-in-tests
       OPENAI_EMBEDDING_MODEL: text-embedding-3-small
-      OPENAI_CHAT_MODEL: gpt-4o-mini
+      OPENAI_CHAT_MODEL: gpt-4o
       OPENAI_EMBEDDING_DIMENSIONS: "1536"
       APP_ENV: test
       APP_NAME: Organic Care AI
@@ -130,6 +130,9 @@ jobs:
 
             echo "Installing dependencies..."
             pip install -r requirements.txt --quiet
+
+            echo "Patching .env with latest model settings..."
+            sed -i 's/^OPENAI_CHAT_MODEL=.*/OPENAI_CHAT_MODEL=gpt-4o/' .env || true
 
             # Re-apply systemd service file if it changed (uses tee, no cp permission needed)
             if ! diff -q ~/AI-Organic-Care/backend/organic-care-api.service \
