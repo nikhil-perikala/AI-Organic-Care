@@ -175,42 +175,85 @@ async def generate_recipe(
 
     # Not found in DB — generate with AI
     client = get_openai_client()
-    prompt = f"""Generate a complete recipe for "{q_clean}". Return ONLY a JSON object with these exact fields:
+    system_msg = (
+        "You are a professional chef and recipe developer with 20 years of experience "
+        "writing cookbooks and tested recipes. You always use accurate, realistic ingredient "
+        "quantities that match the serving size and cooking method. Your recipes are "
+        "indistinguishable from those published in professional cookbooks. "
+        "CRITICAL RULES for quantities:\n"
+        "- Scale all ingredients to match the exact serving count.\n"
+        "- For meat/poultry/seafood: use 150-200 g per serving (e.g. 4 servings → 600-800 g).\n"
+        "- For oil in a curry/stew base: 3-4 tbsp per 4 servings, never less than 2 tbsp total.\n"
+        "- For onions in a curry: 2 medium onions (≈300 g) per 4 servings.\n"
+        "- For salt: 3/4 – 1 tsp per 4 servings; adjust to taste.\n"
+        "- For spices: use precise measurements (tsp/tbsp), not vague terms.\n"
+        "- For pasta/rice/grains: 75-90 g dry weight per serving.\n"
+        "- For liquid in braises/curries: 150-250 ml per 4 servings (enough to braise, not drown).\n"
+        "Never round all quantities to round numbers — varied, realistic amounts (e.g. 1½ tsp, ¾ cup) "
+        "signal a tested recipe."
+    )
+
+    prompt = f"""Generate a complete, professionally tested recipe for "{q_clean}".
+
+The recipe must use 4 servings as the default unless the dish is inherently single-serve.
+All ingredient quantities MUST be calibrated for that exact serving count.
+
+Return ONLY a JSON object with these exact fields:
 {{
-  "title": "Recipe name",
-  "description": "Brief 1-2 sentence description",
-  "prep_time_minutes": 10,
-  "cook_time_minutes": 20,
-  "servings": 2,
-  "meal_type": "Breakfast or Lunch or Dinner or Snacks or Beverage",
-  "cuisine_type": "e.g. Indian, Italian, Chinese",
+  "title": "Exact recipe name",
+  "description": "Appetising 1–2 sentence description highlighting the dish character",
+  "prep_time_minutes": 15,
+  "cook_time_minutes": 35,
+  "servings": 4,
+  "meal_type": "Lunch",
+  "cuisine_type": "Indian",
   "ingredients": [
-    {{"name": "ingredient", "quantity": "2", "unit": "cups"}}
+    {{"name": "bone-in mutton", "quantity": "750", "unit": "g"}},
+    {{"name": "cooking oil", "quantity": "4", "unit": "tbsp"}},
+    {{"name": "onion", "quantity": "2 medium", "unit": ""}},
+    {{"name": "ginger-garlic paste", "quantity": "2", "unit": "tbsp"}},
+    {{"name": "salt", "quantity": "1", "unit": "tsp"}}
   ],
   "instructions": [
-    "Heat oil in a pan over medium heat.",
-    "Add onions and cook until golden."
+    "Heat 4 tablespoons of oil in a heavy-bottomed pot over medium-high heat.",
+    "Add the sliced onions and fry, stirring often, for 12–15 minutes until deep golden brown.",
+    "Stir in the ginger-garlic paste and cook for 2 minutes until the raw smell disappears.",
+    "Add the mutton pieces and sear on all sides for 5–6 minutes until lightly browned.",
+    "Sprinkle in all the ground spices and salt; stir well to coat every piece.",
+    "Pour in 250 ml of warm water, bring to a boil, then reduce heat to low.",
+    "Cover tightly and simmer for 50–60 minutes, stirring every 15 minutes, until the mutton is tender.",
+    "Uncover, raise heat to medium, and cook off excess moisture for 5 minutes until the gravy coats the meat.",
+    "Garnish with fresh coriander and serve hot with rice or naan."
   ],
   "nutritional_info": {{
-    "calories": 320,
-    "protein_g": 18,
-    "carbs_g": 30,
-    "fat_g": 12,
-    "fiber_g": 4
+    "calories": 420,
+    "protein_g": 36,
+    "carbs_g": 8,
+    "fat_g": 28,
+    "fiber_g": 2
   }},
-  "cooking_tips": ["Tip 1", "Tip 2"],
-  "dietary_labels": ["Vegetarian"],
-  "health_benefits": ["High protein"],
+  "cooking_tips": [
+    "Marinate the mutton in yoghurt and spices for 2 hours beforehand for deeper flavour.",
+    "Bone-in pieces give richer gravy than boneless."
+  ],
+  "dietary_labels": ["Gluten-Free"],
+  "health_benefits": ["High in protein", "Rich in iron"],
   "ailment_tags": []
 }}
-Provide realistic values. Instructions: 6-10 complete sentences (no numbering prefix). Keep each step clear."""
+
+IMPORTANT: The JSON above is only a structural example with mutton quantities for illustration.
+Generate the ACTUAL recipe for "{q_clean}" using correct quantities for THAT dish.
+Instructions must be 7–10 complete, detailed sentences — no numbering prefix, no bullet points."""
 
     response = await client.chat.completions.create(
         model=settings.OPENAI_CHAT_MODEL,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": prompt},
+        ],
         response_format={"type": "json_object"},
-        temperature=0.3,
-        max_tokens=1200,
+        temperature=0.2,
+        max_tokens=1600,
     )
 
     data = json.loads(response.choices[0].message.content)
@@ -243,35 +286,55 @@ async def claude_pantry_recipes(request: PantryRecipeRequest):
         raise HTTPException(status_code=400, detail="No ingredients provided")
 
     ing_str = ", ".join(request.ingredients)
-    prompt = f"""I have these ingredients: {ing_str}
+    pantry_system = (
+        "You are a professional chef. Generate recipes with accurate, realistic ingredient quantities. "
+        "All amounts must be calibrated for 2 servings unless the dish is naturally single-serve. "
+        "Use standard culinary measurements: tsp, tbsp, cups, g, ml, etc. "
+        "Common sense proportions: 1 egg per serving, 150-200 g meat per serving, "
+        "1-2 tbsp oil per dish, 3/4 tsp salt per 2 servings."
+    )
+    prompt = f"""I have these ingredients available: {ing_str}
+(Common pantry staples like salt, pepper, oil, water, and basic spices are also available.)
 
-Generate exactly 3 recipes using only these ingredients (common staples like salt, pepper, oil are fine).
-Return ONLY a valid JSON array of exactly 3 objects — no markdown, no backticks, no extra text.
-[
-  {{
-    "name": "Recipe Name",
-    "time": 25,
-    "match": 80,
-    "ingredients": ["2 eggs", "1 clove garlic, minced"],
-    "steps": ["Heat oil in a pan.", "Add garlic and cook 1 minute."],
-    "icon": "egg"
-  }}
-]
+Generate exactly 3 different recipes I can make. Each recipe must serve 2 people.
+All ingredient quantities must be realistic and accurately calibrated for 2 servings.
+
+Return a JSON object with a single key "recipes" containing an array of exactly 3 objects:
+{{
+  "recipes": [
+    {{
+      "name": "Recipe Name",
+      "time": 25,
+      "match": 85,
+      "ingredients": ["2 large eggs", "1 tbsp olive oil", "1/2 tsp salt", "1/4 tsp black pepper"],
+      "steps": [
+        "Heat 1 tablespoon of olive oil in a non-stick pan over medium heat.",
+        "Crack the eggs directly into the pan and season with salt and pepper.",
+        "Cook for 3-4 minutes until whites are set but yolks are still slightly runny.",
+        "Slide onto a plate and serve immediately."
+      ],
+      "icon": "egg"
+    }}
+  ]
+}}
 Rules:
-- "time": total cook+prep minutes as integer
-- "match": % of required ingredients covered by the provided list (0-100 integer)
-- "ingredients": complete list with quantities as plain strings
-- "steps": 4-6 clear cooking steps as strings
-- "icon": single word from: egg, meat, fish, leaf, salad, soup, pizza, bread, flame, carrot"""
+- "time": total prep + cook minutes as a realistic integer
+- "match": % of the recipe's required ingredients that are covered by my list (0–100 integer)
+- "ingredients": every ingredient with precise quantity and unit as a plain string
+- "steps": 4–6 clear, detailed cooking steps as strings (no numbering prefix)
+- "icon": one word from: egg, meat, fish, leaf, salad, soup, pizza, bread, flame, carrot"""
 
     try:
         client = get_openai_client()
         response = await client.chat.completions.create(
             model=settings.OPENAI_CHAT_MODEL,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": pantry_system},
+                {"role": "user", "content": prompt},
+            ],
             response_format={"type": "json_object"},
-            temperature=0.5,
-            max_tokens=1500,
+            temperature=0.3,
+            max_tokens=1800,
         )
         raw = response.choices[0].message.content or "[]"
         data = json.loads(raw)
@@ -286,32 +349,63 @@ Rules:
 @router.get("/claude-explore")
 async def claude_explore_recipe(q: str = Query(..., min_length=1, max_length=200)):
     """Generate a single recipe for any query using OpenAI."""
-    prompt = f"""Generate a complete recipe for: {q}
+    explore_system = (
+        "You are a professional chef and food writer. Every recipe you write uses accurate, "
+        "realistic quantities that a home cook would actually use. Quantities must match the serving count. "
+        "Do not round all values to the nearest whole number — vary them naturally (e.g. 1½ tsp, 3 tbsp, 400 g). "
+        "Standard proportions: 150-200 g meat per serving, 1-2 tbsp oil per dish base, "
+        "75-90 g dry pasta/rice per serving, 3/4 tsp salt per 4 servings."
+    )
+    prompt = f"""Write a complete, professionally tested recipe for: {q}
 
-Return ONLY a valid JSON object — no markdown, no backticks, no extra text.
+The recipe should serve 4 people. Calibrate ALL ingredient quantities to 4 servings precisely.
+
+Return ONLY a JSON object:
 {{
-  "name": "Recipe Name",
-  "time": 30,
-  "servings": 2,
-  "ingredients": ["2 eggs", "1 onion, diced"],
-  "steps": ["Step one.", "Step two."],
-  "tip": "One useful chef's tip."
+  "name": "Dish name",
+  "time": 45,
+  "servings": 4,
+  "ingredients": [
+    "600 g bone-in chicken pieces",
+    "3 tbsp cooking oil",
+    "2 medium onions, finely sliced",
+    "1 tbsp ginger-garlic paste",
+    "1 tsp cumin seeds",
+    "1 tsp coriander powder",
+    "½ tsp turmeric powder",
+    "1 tsp garam masala",
+    "¾ tsp salt (or to taste)",
+    "200 ml warm water",
+    "2 tbsp fresh coriander, chopped"
+  ],
+  "steps": [
+    "Step one with precise technique and timing.",
+    "Step two continuing the process.",
+    "Step three.",
+    "Step four.",
+    "Step five.",
+    "Step six."
+  ],
+  "tip": "One specific, actionable chef's tip for this dish."
 }}
 Rules:
-- "time": total time in minutes as integer
-- "servings": number as integer
-- "ingredients": complete list with quantities as plain strings
-- "steps": 5-7 clear cooking instructions
-- "tip": one practical cooking tip"""
+- "time": realistic total cook + prep time in minutes
+- "servings": always 4
+- "ingredients": every ingredient with exact quantity and unit; be as specific as a cookbook
+- "steps": 6–8 clear, detailed instructions (no numbering prefix, no bullet points)
+- "tip": one concrete technique tip, not generic advice"""
 
     try:
         client = get_openai_client()
         response = await client.chat.completions.create(
             model=settings.OPENAI_CHAT_MODEL,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": explore_system},
+                {"role": "user", "content": prompt},
+            ],
             response_format={"type": "json_object"},
-            temperature=0.4,
-            max_tokens=1200,
+            temperature=0.2,
+            max_tokens=1400,
         )
         raw = response.choices[0].message.content or "{}"
         return json.loads(raw)
