@@ -38,8 +38,6 @@ interface DayPlan {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-const STOP = new Set(['and','the','with','for','from','made','easy','quick','healthy','organic','fresh','style']);
-
 function mealImg(title: string, _mealType: string | null): string {
   // picsum gives a deterministic photo per seed — no API key needed, always loads
   const seed = encodeURIComponent(title.toLowerCase().replace(/\s+/g, '-'));
@@ -79,31 +77,41 @@ function monday(offsetWeeks = 0): Date {
 }
 
 function buildPlan(recipes: ApiRecipe[], pantry: string[], offsetWeeks: number): DayPlan[] {
-  const shuffle = <T>(a: T[]): T[] => [...a].sort(() => Math.random() - 0.5);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const mon = monday(offsetWeeks);
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => {
+    const date = new Date(mon); date.setDate(mon.getDate() + i);
+    return { day, date, isToday: date.getTime() === today.getTime(),
+      dateLabel: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) };
+  });
 
+  // No recipes in DB — return empty slots so the grid still renders
+  if (recipes.length === 0) {
+    return days.map(d => ({ ...d, breakfast: null, lunch: null, dinner: null }));
+  }
+
+  const shuffle = <T>(a: T[]): T[] => [...a].sort(() => Math.random() - 0.5);
   const bp = shuffle(recipes.filter(r => ['breakfast','snack'].includes(r.meal_type ?? '')));
   const lp = shuffle(recipes.filter(r => ['lunch','salad'].includes(r.meal_type ?? '')));
   const dp = shuffle(recipes.filter(r => ['dinner','main'].includes(r.meal_type ?? '')));
   const any = shuffle(recipes);
 
-  const pick = (pool: ApiRecipe[], used: Set<string>): ApiRecipe => {
-    const avail = (pool.length > 0 ? pool : any).filter(r => !used.has(r.id));
-    const r = avail[0] ?? any.find(x => !used.has(x.id)) ?? any[0];
+  const pick = (pool: ApiRecipe[], used: Set<string>): ApiRecipe | null => {
+    const src  = pool.length > 0 ? pool : any;
+    const avail = src.filter(r => !used.has(r.id));
+    const r = avail[0] ?? any.find(x => !used.has(x.id)) ?? null;
     if (r) used.add(r.id);
     return r;
   };
 
   const used = new Set<string>();
-  return ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => {
-    const date = new Date(mon); date.setDate(mon.getDate() + i);
+  return days.map(d => {
+    const b = pick(bp, used); const l = pick(lp, used); const dn = pick(dp, used);
     return {
-      day, date, isToday: date.getTime() === today.getTime(),
-      dateLabel: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      breakfast: toMeal(pick(bp, used), pantry),
-      lunch:     toMeal(pick(lp, used), pantry),
-      dinner:    toMeal(pick(dp, used), pantry),
+      ...d,
+      breakfast: b  ? toMeal(b,  pantry) : null,
+      lunch:     l  ? toMeal(l,  pantry) : null,
+      dinner:    dn ? toMeal(dn, pantry) : null,
     };
   });
 }
