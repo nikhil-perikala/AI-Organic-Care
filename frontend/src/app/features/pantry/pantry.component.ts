@@ -7,8 +7,39 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Subject, debounceTime, distinctUntilChanged, switchMap, of, takeUntil, catchError } from 'rxjs';
+import { Subject, debounceTime, distinctUntilChanged, switchMap, of, takeUntil, catchError, map } from 'rxjs';
 import { PantryService, PantryItem, UsdaFood, ExtractedItem } from '../../core/services/pantry.service';
+
+// Local ingredient list used as instant fallback when the API is unavailable
+const LOCAL_INGREDIENTS = [
+  'Tomato','Cherry tomatoes','Tomato paste','Tomato sauce',
+  'Chicken breast','Chicken thighs','Chicken drumsticks','Ground chicken',
+  'Beef steak','Ground beef','Pork chops','Lamb chops','Lamb mince',
+  'Salmon fillet','Tuna','Shrimp','Cod','Sardines','Mackerel',
+  'Eggs','Tofu','Tempeh','Paneer',
+  'Whole milk','Butter','Cheddar cheese','Mozzarella','Greek yogurt','Heavy cream','Coconut milk',
+  'Spinach','Kale','Lettuce','Arugula','Cabbage','Broccoli','Cauliflower',
+  'Zucchini','Eggplant','Carrot','Beetroot','Sweet potato','Potato',
+  'Bell pepper','Chilli pepper','Cucumber','Onion','Red onion','Spring onion',
+  'Garlic','Ginger','Celery','Asparagus','Peas','Edamame',
+  'Mushroom','Portobello mushroom','Shiitake mushroom',
+  'Apple','Banana','Orange','Mango','Pineapple','Blueberries','Strawberries',
+  'Raspberries','Grapes','Peach','Pear','Watermelon','Lemon','Lime','Avocado',
+  'Basmati rice','Brown rice','Jasmine rice','Pasta','Spaghetti','Noodles',
+  'Oats','Quinoa','Barley','Wheat flour','Bread','Cornmeal',
+  'Lentils','Red lentils','Chickpeas','Black beans','Kidney beans','Mung beans',
+  'Almonds','Walnuts','Cashews','Peanuts','Pistachios','Chia seeds','Flaxseeds','Sesame seeds',
+  'Olive oil','Coconut oil','Sunflower oil','Vegetable oil','Sesame oil',
+  'Honey','Sugar','Brown sugar','Maple syrup',
+  'Salt','Black pepper','Cumin','Turmeric','Coriander','Paprika',
+  'Cinnamon','Cardamom','Bay leaves','Oregano','Basil','Thyme','Rosemary',
+  'Parsley','Cilantro','Dill','Mint','Chilli powder','Garam masala','Curry powder',
+  'Soy sauce','Fish sauce','Oyster sauce','Worcestershire sauce',
+  'Vinegar','Apple cider vinegar','Balsamic vinegar',
+  'Chicken stock','Beef stock','Vegetable stock',
+  'Baking powder','Baking soda','Cornstarch',
+  'Dark chocolate','Cocoa powder','Vanilla extract','Almond flour','Coconut flour',
+];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -988,13 +1019,27 @@ export class PantryComponent implements OnInit, OnDestroy {
       switchMap(q => {
         if (q.length < 2) { this.foodResults.set([]); this.searching.set(false); return of([]); }
         this.searching.set(true);
-        return this.pantryService.searchFoods(q).pipe(catchError(() => of([])));
+        return this.pantryService.searchFoods(q).pipe(
+          map(results => results.length > 0 ? results : this.localSuggestions(q)),
+          catchError(() => of(this.localSuggestions(q))),
+        );
       }),
       takeUntil(this.destroy$),
     ).subscribe(results => { this.foodResults.set(results); this.searching.set(false); });
   }
 
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
+
+  private localSuggestions(q: string): UsdaFood[] {
+    const ql = q.toLowerCase();
+    return LOCAL_INGREDIENTS
+      .filter(name => name.toLowerCase().includes(ql))
+      .slice(0, 8)
+      .map((name, i) => ({
+        fdc_id: i + 1, description: name, data_type: 'ingredient',
+        calories: null, protein: null, carbs: null, fat: null,
+      }));
+  }
 
   // ── USDA search ────────────────────────────────────────────────────────────
 
