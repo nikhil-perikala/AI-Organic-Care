@@ -156,6 +156,10 @@ jobs:
             fi
             alembic upgrade head
 
+            echo "Killing any orphan process on port 8000..."
+            sudo fuser -k 8000/tcp 2>/dev/null || true
+            sleep 1
+
             echo "Restarting backend service..."
             sudo systemctl restart organic-care-api
 

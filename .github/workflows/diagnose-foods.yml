@@ -17,20 +17,14 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script_stop: false
           script: |
-            echo "=== DEPLOYED CODE ==="
-            cat ~/AI-Organic-Care/backend/app/api/foods.py
+            echo "=== WHAT IS ON PORT 8000 ==="
+            sudo ss -tlnp | grep 8000 || echo "(nothing found on 8000)"
+            sudo fuser 8000/tcp 2>/dev/null || echo "(fuser: nothing)"
 
             echo ""
-            echo "=== PYCACHE FILES ==="
-            ls -la ~/AI-Organic-Care/backend/app/api/__pycache__/ | grep -i foods || echo "(no foods pyc found)"
-
-            echo ""
-            echo "=== RECENT SERVICE LOGS ==="
-            sudo journalctl -u organic-care-api -n 60 --no-pager
-
-            echo ""
-            echo "=== LOCAL CURL TEST (before fix) ==="
-            curl -s -o /dev/null -w "HTTP %{http_code}\n" "http://127.0.0.1:8000/api/v1/foods/search?q=tomato" || echo "curl failed"
+            echo "=== KILLING ROGUE PROCESS ON PORT 8000 ==="
+            sudo fuser -k 8000/tcp 2>/dev/null && echo "Killed." || echo "(no process to kill)"
+            sleep 2
 
             echo ""
             echo "=== CLEARING ALL PYCACHE ==="
@@ -39,13 +33,17 @@ jobs:
             echo "Pycache cleared."
 
             echo ""
-            echo "=== RESTARTING SERVICE ==="
-            sudo systemctl restart organic-care-api
+            echo "=== STARTING SERVICE ==="
+            sudo systemctl start organic-care-api
             sleep 6
 
             echo ""
-            echo "=== LOCAL CURL TEST (after fix) ==="
-            curl -sv "http://127.0.0.1:8000/api/v1/foods/search?q=tomato" 2>&1 || echo "curl failed"
+            echo "=== SERVICE STATUS ==="
+            sudo systemctl status organic-care-api --no-pager || true
+
+            echo ""
+            echo "=== LOCAL CURL TEST ==="
+            curl -s "http://127.0.0.1:8000/api/v1/foods/search?q=tomato" || echo "curl failed"
 
             echo ""
             echo "=== FINAL SERVICE LOGS ==="
