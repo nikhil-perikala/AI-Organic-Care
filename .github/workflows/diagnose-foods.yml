@@ -18,32 +18,6 @@ jobs:
           script_stop: false
           script: |
             cd ~/AI-Organic-Care/backend
+            git fetch origin main && git reset --hard origin/main
             source .venv/bin/activate
-
-            # Load the DATABASE_URL from .env
-            export $(grep -E '^DATABASE_URL=' .env | head -1)
-            # Convert asyncpg URL to psql-compatible URL
-            PSQL_URL="${DATABASE_URL/postgresql+asyncpg/postgresql}"
-
-            echo "=== TABLE EXISTS? ==="
-            psql "$PSQL_URL" -c "\dt food_ai_search" 2>&1 || echo "psql failed"
-
-            echo ""
-            echo "=== ROW COUNT ==="
-            psql "$PSQL_URL" -c "SELECT COUNT(*) FROM food_ai_search;" 2>&1
-
-            echo ""
-            echo "=== COLUMN NAMES ==="
-            psql "$PSQL_URL" -c "\d food_ai_search" 2>&1
-
-            echo ""
-            echo "=== SAMPLE ROW ==="
-            psql "$PSQL_URL" -c "SELECT * FROM food_ai_search LIMIT 1;" 2>&1
-
-            echo ""
-            echo "=== TAMARIND SEARCH ==="
-            psql "$PSQL_URL" -c "SELECT fdc_id, description, data_type FROM food_ai_search WHERE description ILIKE '%tamarind%' LIMIT 5;" 2>&1
-
-            echo ""
-            echo "=== TOMATO SEARCH ==="
-            psql "$PSQL_URL" -c "SELECT fdc_id, description FROM food_ai_search WHERE description ILIKE '%tomato%' LIMIT 3;" 2>&1
+            python db_diagnose.py
