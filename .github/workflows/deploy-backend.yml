@@ -131,6 +131,10 @@ jobs:
             echo "Installing dependencies..."
             pip install -r requirements.txt --quiet
 
+            echo "Clearing stale bytecode cache..."
+            find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+            find . -name "*.pyc" -delete 2>/dev/null || true
+
             echo "Patching .env with latest model settings..."
             sed -i 's/^OPENAI_CHAT_MODEL=.*/OPENAI_CHAT_MODEL=gpt-4o/' .env || true
 

@@ -1,0 +1,52 @@
+name: Diagnose and Fix Foods API
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose-and-fix:
+    name: Diagnose foods endpoint and clear pycache
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Diagnose and fix on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: false
+          script: |
+            echo "=== DEPLOYED CODE ==="
+            cat ~/AI-Organic-Care/backend/app/api/foods.py
+
+            echo ""
+            echo "=== PYCACHE FILES ==="
+            ls -la ~/AI-Organic-Care/backend/app/api/__pycache__/ | grep -i foods || echo "(no foods pyc found)"
+
+            echo ""
+            echo "=== RECENT SERVICE LOGS ==="
+            sudo journalctl -u organic-care-api -n 60 --no-pager
+
+            echo ""
+            echo "=== LOCAL CURL TEST (before fix) ==="
+            curl -s -o /dev/null -w "HTTP %{http_code}\n" "http://127.0.0.1:8000/api/v1/foods/search?q=tomato" || echo "curl failed"
+
+            echo ""
+            echo "=== CLEARING ALL PYCACHE ==="
+            find ~/AI-Organic-Care/backend -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+            find ~/AI-Organic-Care/backend -name "*.pyc" -delete 2>/dev/null || true
+            echo "Pycache cleared."
+
+            echo ""
+            echo "=== RESTARTING SERVICE ==="
+            sudo systemctl restart organic-care-api
+            sleep 6
+
+            echo ""
+            echo "=== LOCAL CURL TEST (after fix) ==="
+            curl -sv "http://127.0.0.1:8000/api/v1/foods/search?q=tomato" 2>&1 || echo "curl failed"
+
+            echo ""
+            echo "=== FINAL SERVICE LOGS ==="
+            sudo journalctl -u organic-care-api -n 20 --no-pager
