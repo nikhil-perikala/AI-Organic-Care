@@ -2,7 +2,7 @@ import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
-import { RouterLink } from '@angular/router';
+import { RouterLink, ActivatedRoute } from '@angular/router';
 import { catchError, of } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/services/auth.service';
@@ -290,7 +290,7 @@ function claudeCardToDetail(r: any): RecipeDetail {
         @if (searchLoading()) {
           <div class="loading-box mt-4">
             <i class="ti ti-loader-2 spin"></i>
-            <span>Generating recipe details…</span>
+            <span>{{ loadingMsg() }}</span>
           </div>
         }
 
@@ -707,7 +707,8 @@ function claudeCardToDetail(r: any): RecipeDetail {
   `],
 })
 export class MealsComponent implements OnInit {
-  private http = inject(HttpClient);
+  private http  = inject(HttpClient);
+  private route = inject(ActivatedRoute);
   auth = inject(AuthService);
   favs = inject(FavoritesService);
 
@@ -740,6 +741,8 @@ export class MealsComponent implements OnInit {
   searchLoading = signal(false);
   searchError   = false;
   exploreDetail = signal<RecipeDetail | null>(null);
+  loadingMsg    = signal('Asking the AI chef…');
+  private msgTimer: ReturnType<typeof setInterval> | null = null;
 
   readonly defaultExplore = DEFAULT_EXPLORE;
 
@@ -751,6 +754,13 @@ export class MealsComponent implements OnInit {
     } else {
       this.pantryLoading.set(false);
     }
+
+    // If navigated here from Meal Planner's "View Full Recipe", auto-open the detail
+    const params = this.route.snapshot.queryParamMap;
+    const tab    = params.get('tab');
+    const recipe = params.get('recipe');
+    if (tab === 'explore') this.activeTab.set('explore');
+    if (recipe)            this.fetchAndShowDetail(recipe);
   }
 
   private loadPantry() {
@@ -805,10 +815,20 @@ export class MealsComponent implements OnInit {
     this.searchLoading.set(true);
     this.searchError = false;
     this.exploreDetail.set(null);
+
+    const msgs = ['Asking the AI chef…', 'Crafting the recipe…', 'Measuring ingredients…', 'Almost ready…'];
+    let idx = 0;
+    this.loadingMsg.set(msgs[0]);
+    this.msgTimer = setInterval(() => {
+      idx = (idx + 1) % msgs.length;
+      this.loadingMsg.set(msgs[idx]);
+    }, 4000);
+
     this.http
       .get<any>(`${environment.apiUrl}/recipes/generate?q=${encodeURIComponent(title)}`)
       .pipe(catchError(() => of(null)))
       .subscribe(r => {
+        if (this.msgTimer) { clearInterval(this.msgTimer); this.msgTimer = null; }
         if (r) {
           this.exploreDetail.set(genToDetail(r));
         } else {

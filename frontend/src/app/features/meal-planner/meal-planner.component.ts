@@ -568,7 +568,7 @@ function buildPlan(recipes: ApiRecipe[], pantry: string[], offsetWeeks: number):
               <span style="font-size:13px;color:#e65100">Need: <strong>{{ detailMeal()!.missingIngredients.join(', ') }}</strong></span>
             </div>
           }
-          <button class="view-rec-btn" routerLink="/recommendations" (click)="detailMeal.set(null)">
+          <button class="view-rec-btn" (click)="viewFullRecipe()">
             View Full Recipe & Instructions
             <mat-icon style="font-size:16px;width:16px;height:16px">arrow_forward</mat-icon>
           </button>
@@ -1085,6 +1085,13 @@ export class MealPlannerComponent implements OnInit {
   }
 
   openMealDetail(meal: PlanMeal) { this.detailMeal.set(meal); }
+
+  viewFullRecipe() {
+    const meal = this.detailMeal();
+    if (!meal) return;
+    this.detailMeal.set(null);
+    this.router.navigate(['/meals'], { queryParams: { tab: 'explore', recipe: meal.title } });
+  }
 
   setWater(n: number) { this.waterGlasses.set(n === this.waterGlasses() ? n - 1 : n); }
 
