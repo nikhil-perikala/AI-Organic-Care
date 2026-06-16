@@ -1,7 +1,11 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
+import { HttpClient } from '@angular/common/http';
+import { catchError, of } from 'rxjs';
+import { environment } from '../../../environments/environment';
+import { AuthService } from '../../core/services/auth.service';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -457,8 +461,10 @@ const MOCK: AppNotification[] = [
     }
   `],
 })
-export class NotificationsComponent {
+export class NotificationsComponent implements OnInit {
   readonly router = inject(Router);
+  private http    = inject(HttpClient);
+  private auth    = inject(AuthService);
 
   readonly filterDefs: { key: FilterKey; label: string; icon: string }[] = [
     { key: 'all',      label: 'All',      icon: 'notifications' },
@@ -471,6 +477,22 @@ export class NotificationsComponent {
 
   activeFilter  = signal<FilterKey>('all');
   notifications = signal<AppNotification[]>(MOCK);
+
+  ngOnInit() {
+    if (!this.auth.isLoggedIn()) return;
+    this.http
+      .get<any[]>(`${environment.apiUrl}/notifications`)
+      .pipe(catchError(() => of(null)))
+      .subscribe(data => {
+        if (!data) return; // keep MOCK on error
+        const parsed: AppNotification[] = data.map(n => ({
+          ...n,
+          time: new Date(n.time),
+        }));
+        // show MOCK items if the API returned nothing (new user with empty DB)
+        this.notifications.set(parsed.length > 0 ? parsed : MOCK);
+      });
+  }
 
   unreadCount = computed(() => this.notifications().filter(n => !n.read).length);
 
