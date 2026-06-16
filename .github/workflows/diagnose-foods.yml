@@ -17,34 +17,33 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script_stop: false
           script: |
-            echo "=== WHAT IS ON PORT 8000 ==="
-            sudo ss -tlnp | grep 8000 || echo "(nothing found on 8000)"
-            sudo fuser 8000/tcp 2>/dev/null || echo "(fuser: nothing)"
+            cd ~/AI-Organic-Care/backend
+            source .venv/bin/activate
+
+            # Load the DATABASE_URL from .env
+            export $(grep -E '^DATABASE_URL=' .env | head -1)
+            # Convert asyncpg URL to psql-compatible URL
+            PSQL_URL="${DATABASE_URL/postgresql+asyncpg/postgresql}"
+
+            echo "=== TABLE EXISTS? ==="
+            psql "$PSQL_URL" -c "\dt food_ai_search" 2>&1 || echo "psql failed"
 
             echo ""
-            echo "=== KILLING ROGUE PROCESS ON PORT 8000 ==="
-            sudo fuser -k 8000/tcp 2>/dev/null && echo "Killed." || echo "(no process to kill)"
-            sleep 2
+            echo "=== ROW COUNT ==="
+            psql "$PSQL_URL" -c "SELECT COUNT(*) FROM food_ai_search;" 2>&1
 
             echo ""
-            echo "=== CLEARING ALL PYCACHE ==="
-            find ~/AI-Organic-Care/backend -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
-            find ~/AI-Organic-Care/backend -name "*.pyc" -delete 2>/dev/null || true
-            echo "Pycache cleared."
+            echo "=== COLUMN NAMES ==="
+            psql "$PSQL_URL" -c "\d food_ai_search" 2>&1
 
             echo ""
-            echo "=== STARTING SERVICE ==="
-            sudo systemctl start organic-care-api
-            sleep 6
+            echo "=== SAMPLE ROW ==="
+            psql "$PSQL_URL" -c "SELECT * FROM food_ai_search LIMIT 1;" 2>&1
 
             echo ""
-            echo "=== SERVICE STATUS ==="
-            sudo systemctl status organic-care-api --no-pager || true
+            echo "=== TAMARIND SEARCH ==="
+            psql "$PSQL_URL" -c "SELECT fdc_id, description, data_type FROM food_ai_search WHERE description ILIKE '%tamarind%' LIMIT 5;" 2>&1
 
             echo ""
-            echo "=== LOCAL CURL TEST ==="
-            curl -s "http://127.0.0.1:8000/api/v1/foods/search?q=tomato" || echo "curl failed"
-
-            echo ""
-            echo "=== FINAL SERVICE LOGS ==="
-            sudo journalctl -u organic-care-api -n 20 --no-pager
+            echo "=== TOMATO SEARCH ==="
+            psql "$PSQL_URL" -c "SELECT fdc_id, description FROM food_ai_search WHERE description ILIKE '%tomato%' LIMIT 3;" 2>&1
