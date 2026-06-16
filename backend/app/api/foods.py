@@ -76,7 +76,9 @@ async def search_usda_foods(
         if results:
             return results
     except Exception:
-        pass
+        # Postgres puts the transaction in an error state on any failure.
+        # Must rollback before running any further queries on this session.
+        await db.rollback()
 
     # ── 2. ingredients table (seeded recipe ingredients) ──────────────────────
     try:
@@ -88,6 +90,7 @@ async def search_usda_foods(
         )
         db_names = [r.name for r in ing_rows.all()]
     except Exception:
+        await db.rollback()
         db_names = []
 
     # ── 3. Hardcoded common-pantry fallback ───────────────────────────────────
