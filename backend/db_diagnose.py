@@ -17,8 +17,18 @@ async def main() -> None:
     exists = await conn.fetchval("SELECT to_regclass('public.food_ai_search')::text")
     print("food_ai_search:", exists)
 
+    print("\n=== ALL TABLES IN DB ===")
+    tables = await conn.fetch(
+        "SELECT table_schema, table_name "
+        "FROM information_schema.tables "
+        "WHERE table_schema NOT IN ('pg_catalog','information_schema') "
+        "ORDER BY table_schema, table_name"
+    )
+    for t in tables:
+        print(dict(t))
+
     if not exists:
-        print("Table does not exist — nothing more to check.")
+        print("\nfood_ai_search does not exist — nothing more to check.")
         await conn.close()
         return
 
