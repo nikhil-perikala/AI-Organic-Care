@@ -1,4 +1,8 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_db
 
 router = APIRouter(prefix="/foods", tags=["foods"])
 
@@ -35,12 +39,7 @@ _FALLBACK = [
 ]
 
 
-@router.get("/search")
-async def search_usda_foods(
-    q: str = Query(..., min_length=2, max_length=100),
-    limit: int = Query(8, ge=1, le=20),
-):
-    # Pure local fallback — no DB needed
+def _local_fallback(q: str, limit: int) -> list[dict]:
     q_lower = q.strip().lower()
     matches = [f for f in _FALLBACK if q_lower in f.lower()][:limit]
     return [
@@ -48,3 +47,35 @@ async def search_usda_foods(
          "calories": None, "protein": None, "carbs": None, "fat": None}
         for i, name in enumerate(matches)
     ]
+
+
+@router.get("/search")
+async def search_usda_foods(
+    q: str = Query(..., min_length=2, max_length=100),
+    limit: int = Query(8, ge=1, le=20),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        rows = await db.execute(
+            text("""
+                SELECT fdc_id, description, data_type,
+                       calories, protein, carbs, fat
+                FROM food_ai_search
+                WHERE description ILIKE :pattern
+                ORDER BY
+                    CASE WHEN lower(description) = lower(:q) THEN 0
+                         WHEN lower(description) LIKE lower(:q) || '%' THEN 1
+                         ELSE 2
+                    END,
+                    length(description)
+                LIMIT :lim
+            """),
+            {"pattern": f"%{q}%", "q": q, "lim": limit},
+        )
+        results = rows.mappings().all()
+        if results:
+            return [dict(r) for r in results]
+    except Exception:
+        await db.rollback()
+
+    return _local_fallback(q, limit)
