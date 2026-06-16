@@ -1,0 +1,24 @@
+name: Seed Recipes DB
+
+on:
+  workflow_dispatch:   # manual trigger from GitHub Actions UI
+
+jobs:
+  seed:
+    name: Seed recipes on EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run seed.py on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          script: |
+            cd ~/AI-Organic-Care/backend
+            source .venv/bin/activate
+            echo "Running recipe seed script..."
+            python seed.py
+            echo "Seed complete."
