@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.recipe import Ingredient
@@ -54,25 +54,45 @@ async def search_usda_foods(
     db: AsyncSession = Depends(get_db),
 ):
     q_clean = q.strip()
+    q_lower = q_clean.lower()
 
-    # ── 1. Query the ingredients table (seeded with recipe ingredients) ────────
+    # ── 1. food_ai_search (USDA data — primary source if table exists) ─────────
     try:
-        result = await db.execute(
+        rows = await db.execute(
+            text("""
+                SELECT fdc_id, description, data_type,
+                       ROUND(calories::numeric, 1) AS calories,
+                       ROUND(protein::numeric,  1) AS protein,
+                       ROUND(carbs::numeric,    1) AS carbs,
+                       ROUND(fat::numeric,      1) AS fat
+                FROM food_ai_search
+                WHERE description ILIKE :pattern
+                ORDER BY length(description) ASC
+                LIMIT :limit
+            """),
+            {"pattern": f"%{q_clean}%", "limit": limit},
+        )
+        results = [dict(r) for r in rows.mappings().all()]
+        if results:
+            return results
+    except Exception:
+        pass
+
+    # ── 2. ingredients table (seeded recipe ingredients) ──────────────────────
+    try:
+        ing_rows = await db.execute(
             select(Ingredient.name)
             .where(Ingredient.name.ilike(f"%{q_clean}%"))
             .order_by(func.length(Ingredient.name))
             .limit(limit)
         )
-        db_names = [row.name for row in result.all()]
+        db_names = [r.name for r in ing_rows.all()]
     except Exception:
         db_names = []
 
-    # ── 2. Fallback: filter hardcoded list for anything not covered by DB ──────
-    q_lower = q_clean.lower()
+    # ── 3. Hardcoded common-pantry fallback ───────────────────────────────────
     fallback = [f for f in _FALLBACK if q_lower in f.lower() and f not in db_names]
-
-    names = db_names + fallback
-    names = list(dict.fromkeys(names))[:limit]  # deduplicate, keep order
+    names = list(dict.fromkeys(db_names + fallback))[:limit]
 
     return [
         {
