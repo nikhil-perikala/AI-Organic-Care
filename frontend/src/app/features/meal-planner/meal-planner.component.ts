@@ -18,6 +18,7 @@ interface ApiRecipe {
   prep_time_minutes: number | null; cook_time_minutes: number | null;
   ailment_tags: string[]; health_benefits: string[]; dietary_labels: string[];
   efficacy_score: number;
+  image_url: string | null;
   recipe_ingredients: { ingredient: { name: string } }[];
 }
 
@@ -36,10 +37,57 @@ interface DayPlan {
   dinner:    PlanMeal | null;
 }
 
+// ── Category-matched food images (visually distinct per recipe type) ────────────
+// Each pattern maps to a specific Unsplash photo of that food category.
+// Used only when the recipe has no image_url stored in the DB yet.
+const CATEGORY_IMAGES: Array<[RegExp, string]> = [
+  // Indian / South Asian
+  [/butter chicken|tikka|biryani|masala|paneer|palak|rogan|dal|curry|korma|vindaloo|makhani/i,
+   'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=400&auto=format&fit=crop&q=80'],
+  // Italian / pasta
+  [/pasta|spaghetti|carbonara|risotto|penne|fettuccine|linguine|lasagne|bolognese/i,
+   'https://images.unsplash.com/photo-1473093226555-0b4a714b6af0?w=400&auto=format&fit=crop&q=80'],
+  // Breakfast
+  [/pancake|waffle|toast|oat|yogurt|parfait|banana|smoothie|granola|muffin|french toast/i,
+   'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=400&auto=format&fit=crop&q=80'],
+  // Eggs
+  [/egg|omelette|frittata|scrambled|poached egg/i,
+   'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=400&auto=format&fit=crop&q=80'],
+  // Salads / Mediterranean / Buddha bowls
+  [/salad|hummus|buddha bowl|quinoa|falafel|nicoise|wrap|pita/i,
+   'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&auto=format&fit=crop&q=80'],
+  // Soups & stews
+  [/soup|stew|lentil|chili|broth|bisque/i,
+   'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&auto=format&fit=crop&q=80'],
+  // Fish & seafood
+  [/salmon|tuna|shrimp|prawn|seafood|fish|cod|tilapia|lobster/i,
+   'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=400&auto=format&fit=crop&q=80'],
+  // Rice & Asian
+  [/fried rice|stir.?fry|noodle|ramen|pad thai|fried rice|asian/i,
+   'https://images.unsplash.com/photo-1536304993881-ff86e0c9e07a?w=400&auto=format&fit=crop&q=80'],
+  // Chicken (catch-all before generic meat)
+  [/chicken|poultry/i,
+   'https://images.unsplash.com/photo-1598103442097-8b74394b95c8?w=400&auto=format&fit=crop&q=80'],
+  // Red meat
+  [/beef|lamb|pork|steak|mutton/i,
+   'https://images.unsplash.com/photo-1432139555190-58524dae6a55?w=400&auto=format&fit=crop&q=80'],
+];
+
+const FALLBACK_BY_MEALTYPE: Record<string, string> = {
+  breakfast: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=400&auto=format&fit=crop&q=80',
+  snack:     'https://images.unsplash.com/photo-1490567674331-8e67a6d1d8ef?w=400&auto=format&fit=crop&q=80',
+  lunch:     'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&auto=format&fit=crop&q=80',
+  dinner:    'https://images.unsplash.com/photo-1574484284002-952d92456975?w=400&auto=format&fit=crop&q=80',
+};
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function mealImg(_title: string, _mealType: string | null): string {
-  return ''; // replaced by TheMealDB lookup at runtime
+function mealImg(title: string, mealType: string | null, dbUrl?: string | null): string {
+  if (dbUrl) return dbUrl;
+  for (const [pat, url] of CATEGORY_IMAGES) {
+    if (pat.test(title)) return url;
+  }
+  return FALLBACK_BY_MEALTYPE[mealType ?? 'dinner'] ?? FALLBACK_BY_MEALTYPE['dinner'];
 }
 
 function hasPantry(name: string, pantry: string[]): boolean {
@@ -52,7 +100,7 @@ function toMeal(r: ApiRecipe, pantry: string[]): PlanMeal {
   const missing = ings.filter(n => !hasPantry(n, pantry));
   const mt = r.meal_type ?? 'dinner';
   return {
-    id: r.id, title: r.title, imageUrl: mealImg(r.title, r.meal_type),
+    id: r.id, title: r.title, imageUrl: mealImg(r.title, r.meal_type, r.image_url),
     mealType: mt,
     prepTime: (r.prep_time_minutes ?? 0) + (r.cook_time_minutes ?? 0) || 20,
     calories: mt === 'breakfast' ? 420 : mt === 'lunch' ? 530 : mt === 'snack' ? 190 : 660,
@@ -278,7 +326,7 @@ function buildPlan(recipes: ApiRecipe[], pantry: string[], offsetWeeks: number):
                     </div>
                     @if (getMeal(day, mt.key); as meal) {
                       <div class="meal-card-mobile" (click)="openMealDetail(meal)">
-                        <img [src]="imageMap()[meal.title] || fallbackImg" class="meal-card-mobile-img"
+                        <img [src]="meal.imageUrl" class="meal-card-mobile-img"
                              (error)="$any($event.target).src = fallbackImg">
                         <div class="meal-card-mobile-overlay">
                           <div class="d-flex align-items-start justify-content-between mb-auto">
@@ -335,7 +383,7 @@ function buildPlan(recipes: ApiRecipe[], pantry: string[], offsetWeeks: number):
                 @if (getMeal(day, mt.key); as meal) {
                   <div class="meal-card" [class.meal-locked]="meal.locked"
                     (click)="openMealDetail(meal)">
-                    <img [src]="imageMap()[meal.title] || fallbackImg" class="meal-card-img"
+                    <img [src]="meal.imageUrl" class="meal-card-img"
                          (error)="$any($event.target).src = fallbackImg">
                     <div class="meal-card-gradient"></div>
                     <div class="meal-card-content">
@@ -529,7 +577,7 @@ function buildPlan(recipes: ApiRecipe[], pantry: string[], offsetWeeks: number):
     <div class="modal-backdrop" (click)="detailMeal.set(null)">
       <div class="meal-detail-modal" (click)="$event.stopPropagation()">
         <div class="meal-detail-img-wrap">
-          <img [src]="imageMap()[detailMeal()!.title] || fallbackImg" class="meal-detail-img"
+          <img [src]="detailMeal()!.imageUrl" class="meal-detail-img"
                (error)="$any($event.target).src = fallbackImg">
           <div class="meal-detail-img-overlay">
             <div class="d-flex flex-wrap gap-2 mb-2">
@@ -964,13 +1012,6 @@ export class MealPlannerComponent implements OnInit {
   readonly Math        = Math;
   readonly fallbackImg = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&auto=format&fit=crop&q=80';
 
-  // ── Image loading (TheMealDB, free, no key) ───────────────────────────────
-  imageMap = signal<Record<string, string>>({});
-  private imgCache = new Map<string, string | null>();
-  private readonly IMG_STOP = new Set([
-    'with','and','the','a','an','in','on','at','of','for','from',
-    'spicy','creamy','fried','grilled','baked','roasted','homemade','easy','quick',
-  ]);
 
   readonly mealTypes = [
     { key: 'breakfast' as const, label: 'Breakfast', icon: 'free_breakfast' },
@@ -1029,38 +1070,6 @@ export class MealPlannerComponent implements OnInit {
     return `This week's plan is optimized for ${this.healthGoal === 'all' ? 'balanced nutrition' : this.healthGoal.replace('-',' ')}. Estimated budget: $${this.weeklyBudget()}.`;
   });
 
-  private fetchMealImage(title: string): void {
-    if (!title || this.imgCache.has(title)) return;
-    const words = title.toLowerCase().split(/\s+/).map(w => w.replace(/[(),.]/, ''));
-    const kw = words.filter(w => !this.IMG_STOP.has(w) && w.length > 2);
-    const queries = [title, ...(kw.length >= 2 ? [kw.slice(0, 2).join(' ')] : []), ...(kw.length >= 1 ? [kw[0]] : [])];
-
-    const tryNext = (idx: number) => {
-      if (idx >= queries.length) { this.imgCache.set(title, null); return; }
-      this.http.get<any>('https://www.themealdb.com/api/json/v1/1/search.php', {
-        params: { s: queries[idx] },
-      }).pipe(catchError(() => of(null))).subscribe(data => {
-        const meals = data?.meals;
-        if (meals?.length > 0) {
-          const url: string = meals[0].strMealThumb;
-          this.imgCache.set(title, url);
-          this.imageMap.update(prev => ({ ...prev, [title]: url }));
-        } else { tryNext(idx + 1); }
-      });
-    };
-    tryNext(0);
-  }
-
-  private loadImagesForPlan(plan: DayPlan[]): void {
-    const titles = new Set<string>();
-    for (const d of plan) {
-      if (d.breakfast) titles.add(d.breakfast.title);
-      if (d.lunch)     titles.add(d.lunch.title);
-      if (d.dinner)    titles.add(d.dinner.title);
-    }
-    for (const t of titles) this.fetchMealImage(t);
-  }
-
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit() {
     const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -1078,7 +1087,6 @@ export class MealPlannerComponent implements OnInit {
       this.pantryNames = (pantry as PantryItem[]).map(p => p.ingredient_name.toLowerCase());
       const plan = buildPlan(this.allRecipes, this.pantryNames, this.weekOffset());
       this.weekPlan.set(plan);
-      this.loadImagesForPlan(plan);
       this.loading.set(false);
     });
   }
@@ -1095,7 +1103,6 @@ export class MealPlannerComponent implements OnInit {
         if (current[i]?.dinner?.locked)    day.dinner    = current[i].dinner;
       });
       this.weekPlan.set(newPlan);
-      this.loadImagesForPlan(newPlan);
       this.regenerating.set(false);
     }, 900);
   }
