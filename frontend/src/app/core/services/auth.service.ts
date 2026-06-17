@@ -28,11 +28,12 @@ export class AuthService {
 
   constructor() {
     if (this.getAccessToken()) {
+      // Optimistically mark as logged in so the navbar shows immediately.
+      // fetchMe() will populate the user details; auth failures will logout.
+      this.isLoggedIn.set(true);
+
       this.fetchMe().subscribe({
-        next: user => {
-          this.currentUser.set(user);
-          this.isLoggedIn.set(true);
-        },
+        next: user => this.currentUser.set(user),
         error: (err) => {
           // Only clear session on definitive auth failure (401/403).
           // Network errors or 5xx should not log the user out.
