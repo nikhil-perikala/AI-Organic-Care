@@ -121,12 +121,16 @@ async def main() -> None:
         # Fetch nutrition details in batches
         rows_to_insert: list[tuple] = []
         total_batches = (len(fdc_ids) + BATCH_SIZE - 1) // BATCH_SIZE
+        _printed_sample = False
 
         for i in range(0, len(fdc_ids), BATCH_SIZE):
             batch_ids = fdc_ids[i : i + BATCH_SIZE]
             batch_num = i // BATCH_SIZE + 1
             try:
                 foods = await fetch_food_details(client, batch_ids)
+                if not _printed_sample and foods:
+                    print(f"\nDEBUG sample foodNutrients: {foods[0].get('foodNutrients', [])[:3]}\n")
+                    _printed_sample = True
                 for food in foods:
                     rows_to_insert.append((
                         food["fdcId"],
