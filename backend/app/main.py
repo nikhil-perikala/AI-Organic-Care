@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
-from app.api import auth, recommendations, pantry, users, feedback, recipes, foods, insights, chat, notifications
+from app.api import auth, recommendations, pantry, users, feedback, recipes, foods, insights, chat, notifications, ai_meals
 
 logger = structlog.get_logger()
 
@@ -43,6 +43,7 @@ app.include_router(foods.router, prefix="/api/v1")
 app.include_router(insights.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(notifications.router, prefix="/api/v1")
+app.include_router(ai_meals.router, prefix="/api/v1")
 
 
 @app.get("/health")
