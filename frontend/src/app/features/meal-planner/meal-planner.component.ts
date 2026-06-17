@@ -242,7 +242,8 @@ function weekRange(): string {
                 </div>
                 <div class="sg-desc">{{ s.desc }}</div>
                 <div class="sg-benefit"><i class="ti ti-leaf"></i> {{ s.benefit }}</div>
-                <button class="sg-add-btn" [attr.data-meal]="activeSlot()!.meal"
+                <button class="sg-add-btn"
+                        [style.background]="MEAL_COLOR[activeSlot()!.meal]"
                         (click)="selectSuggestion(s)">
                   Add
                 </button>
@@ -563,9 +564,6 @@ function weekRange(): string {
       cursor: pointer; font-family: inherit; margin-top: 4px;
       transition: opacity .15s; color: #fff;
     }
-    .sg-add-btn[data-meal="breakfast"] { background: var(--teal); }
-    .sg-add-btn[data-meal="lunch"]     { background: var(--amber); }
-    .sg-add-btn[data-meal="dinner"]    { background: var(--purple); }
     .sg-add-btn:hover { opacity: .88; }
 
     /* Cancel */
