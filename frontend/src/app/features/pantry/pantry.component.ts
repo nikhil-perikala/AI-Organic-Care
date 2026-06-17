@@ -159,7 +159,7 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
               <span style="font-size:20px">✨</span>
               <div>
                 <div class="fw-bold" style="font-size:14px">Add Ingredient</div>
-                <div class="text-muted" style="font-size:11px">Search from 1.9M+ USDA foods database</div>
+                <div class="text-muted" style="font-size:11px">Search from USDA whole foods database</div>
               </div>
             </div>
 
