@@ -6,9 +6,13 @@ export const authGuard: CanActivateFn = (_route: ActivatedRouteSnapshot, state: 
   const auth = inject(AuthService);
   const router = inject(Router);
 
+  // Already confirmed logged in
   if (auth.isLoggedIn()) return true;
 
-  // Preserve the intended destination so login can redirect back
+  // Token exists in localStorage — session is still being restored after refresh.
+  // Allow through; the interceptor will refresh the token if expired.
+  if (auth.getAccessToken()) return true;
+
   return router.createUrlTree(['/auth/login'], {
     queryParams: { returnUrl: state.url },
   });

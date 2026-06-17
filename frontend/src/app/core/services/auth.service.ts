@@ -33,7 +33,13 @@ export class AuthService {
           this.currentUser.set(user);
           this.isLoggedIn.set(true);
         },
-        error: () => this.logout(),
+        error: (err) => {
+          // Only clear session on definitive auth failure (401/403).
+          // Network errors or 5xx should not log the user out.
+          if (err?.status === 401 || err?.status === 403) {
+            this.logout();
+          }
+        },
       });
     }
   }
