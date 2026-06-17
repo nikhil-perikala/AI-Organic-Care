@@ -7,6 +7,11 @@ from app.config import settings
 
 router = APIRouter(prefix="/ai", tags=["ai-meals"])
 
+SCHEMA = (
+    '{"name":"≤22 chars","kcal":integer,"time":"X min",'
+    '"desc":"≤35 chars","benefit":"one health benefit ≤60 chars"}'
+)
+
 
 class MealSuggestRequest(BaseModel):
     query: str
@@ -19,23 +24,24 @@ async def meal_suggest(req: MealSuggestRequest):
     client = get_openai_client()
 
     if req.meal_type == "mixed":
+        # query carries the ordered slot-type list for auto-fill
         prompt = (
-            f"Generate exactly {req.count} healthy meal suggestions to fill a weekly planner. "
-            "Mix breakfast (300-500 kcal), lunch (450-700 kcal), and dinner (600-850 kcal) options with variety. "
-            "Return ONLY a raw JSON array — no markdown fences, no backticks, no explanation. "
-            'Each item must have exactly these keys: '
-            '{"name": "string ≤20 chars", "kcal": integer, "time": "X min", "desc": "string ≤35 chars"}'
+            f"You are a meal planner. The user needs {req.count} meals. "
+            f"Slot types in order: {req.query}. "
+            "Return ONLY a raw JSON array matching the slot order — no markdown, no backticks. "
+            f"Each item: {SCHEMA}"
         )
     else:
+        type_label = req.meal_type.capitalize()
         kcal_range = {"breakfast": "300–500", "lunch": "450–700", "dinner": "600–850"}.get(
             req.meal_type, "400–700"
         )
         prompt = (
-            f'Generate exactly {req.count} {req.meal_type} options inspired by "{req.query}". '
-            f"Calories: {kcal_range} kcal each. Make every suggestion distinct and appetising. "
-            "Return ONLY a raw JSON array — no markdown fences, no backticks, no explanation. "
-            'Each item must have exactly these keys: '
-            '{"name": "string ≤20 chars", "kcal": integer, "time": "X min", "desc": "string ≤35 chars"}'
+            f"You are a meal planning assistant. The user wants {type_label} ideas related to "
+            f'"{req.query}". Return exactly {req.count} meal options as a JSON array only, '
+            "no markdown, no backticks. "
+            f"Calories: {kcal_range} kcal. Keep names under 22 chars. "
+            f"Each item: {SCHEMA}"
         )
 
     response = await client.chat.completions.create(
@@ -44,22 +50,20 @@ async def meal_suggest(req: MealSuggestRequest):
             {
                 "role": "system",
                 "content": (
-                    "You are a nutritionist AI assistant. "
-                    "Always respond with ONLY a valid JSON array. "
-                    "No markdown, no backticks, no extra text whatsoever."
+                    "You are a nutritionist AI. "
+                    "Always respond with ONLY a valid JSON array — no markdown, no backticks, no extra text."
                 ),
             },
             {"role": "user", "content": prompt},
         ],
         response_format={"type": "json_object"},
         temperature=0.75,
-        max_tokens=1000,
+        max_tokens=1100,
     )
 
     raw = response.choices[0].message.content or "{}"
     data = json.loads(raw)
 
-    # Model sometimes wraps the array in an object like {"meals": [...]}
     if isinstance(data, dict):
         for v in data.values():
             if isinstance(v, list):
