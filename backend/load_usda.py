@@ -82,14 +82,10 @@ async def fetch_all_fdc_ids(client: httpx.AsyncClient) -> list[int]:
 
 
 async def fetch_food_details(client: httpx.AsyncClient, fdc_ids: list[int]) -> list[dict]:
-    """POST /foods to get abridged nutrition data for a batch of IDs."""
+    """POST /foods to get nutrition data for a batch of IDs."""
     resp = client.post(
         f"{BASE_URL}/foods",
-        json={
-            "fdcIds": fdc_ids,
-            "format": "abridged",
-            "nutrients": WANTED_NUTRIENTS,
-        },
+        json={"fdcIds": fdc_ids, "format": "abridged"},
         params={"api_key": API_KEY},
         timeout=60,
     )
@@ -129,7 +125,9 @@ async def main() -> None:
             try:
                 foods = await fetch_food_details(client, batch_ids)
                 if not _printed_sample and foods:
-                    print(f"\nDEBUG sample foodNutrients: {foods[0].get('foodNutrients', [])[:3]}\n")
+                    f0 = foods[0]
+                    print(f"\nDEBUG keys: {list(f0.keys())}")
+                    print(f"DEBUG foodNutrients[:2]: {f0.get('foodNutrients', [])[:2]}\n")
                     _printed_sample = True
                 for food in foods:
                     rows_to_insert.append((
