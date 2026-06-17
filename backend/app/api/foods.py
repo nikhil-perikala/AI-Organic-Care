@@ -113,7 +113,31 @@ async def search_usda_foods(
     limit: int = Query(8, ge=1, le=20),
     db: AsyncSession = Depends(get_db),
 ):
-    # Search ingredients table (populated by seed.py) first
+    # Try food_ai_search (USDA data) first, fall back to ingredients table
+    db_results: list[str] = []
+    try:
+        rows = await db.execute(
+            text("""
+                SELECT fdc_id, description, data_type, calories, protein, carbs, fat
+                FROM food_ai_search
+                WHERE description ILIKE :pattern
+                ORDER BY
+                    CASE WHEN lower(description) = lower(:q) THEN 0
+                         WHEN lower(description) LIKE lower(:q) || '%' THEN 1
+                         ELSE 2
+                    END,
+                    length(description)
+                LIMIT :lim
+            """),
+            {"pattern": f"%{q}%", "q": q, "lim": limit},
+        )
+        usda_rows = rows.mappings().all()
+        if usda_rows:
+            return [dict(r) for r in usda_rows]
+    except Exception:
+        await db.rollback()
+
+    # Fall back to ingredients table (recipe seed data)
     try:
         rows = await db.execute(
             text("""
