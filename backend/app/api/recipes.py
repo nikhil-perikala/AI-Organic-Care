@@ -109,10 +109,28 @@ async def recipes_from_pantry(
             continue
 
         # ── Pantry match score (0–1) ──────────────────────────────────────
-        matches = sum(1 for p in pantry_names if any(p in i or i in p for i in ing_names))
+        # Use word-boundary matching to avoid "egg" matching "eggplant"
+        def _words(s: str) -> set[str]:
+            return set(s.lower().split())
+
+        pantry_word_sets = [_words(p) for p in pantry_names]
+        ing_word_sets    = [_words(i) for i in ing_names]
+
+        def _ingredient_matched(ing_words: set[str]) -> bool:
+            for p_words in pantry_word_sets:
+                if p_words & ing_words:   # at least one word in common
+                    return True
+            return False
+
+        matches = sum(1 for iw in ing_word_sets if _ingredient_matched(iw))
         if matches == 0:
             continue
         pantry_score = matches / len(ing_names)
+
+        # Require at least 30% ingredient coverage to avoid showing
+        # mushroom recipes just because the user has "salt"
+        if pantry_score < 0.30 and matches < 3:
+            continue
 
         # ── Profile bonus/penalty ─────────────────────────────────────────
         bonus = 0.0
