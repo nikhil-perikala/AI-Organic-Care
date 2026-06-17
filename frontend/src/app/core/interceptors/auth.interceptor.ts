@@ -1,5 +1,6 @@
 import { HttpInterceptorFn, HttpRequest, HttpHandlerFn } from '@angular/common/http';
 import { inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { BehaviorSubject, catchError, filter, switchMap, take, throwError } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 
@@ -8,7 +9,8 @@ let isRefreshing = false;
 const refreshDone$ = new BehaviorSubject<string | null>(null);
 
 export const authInterceptor: HttpInterceptorFn = (req: HttpRequest<unknown>, next: HttpHandlerFn) => {
-  const auth = inject(AuthService);
+  const auth   = inject(AuthService);
+  const router = inject(Router);
 
   const withBearer = (r: HttpRequest<unknown>, token: string) =>
     r.clone({ setHeaders: { Authorization: `Bearer ${token}` } });
@@ -36,6 +38,7 @@ export const authInterceptor: HttpInterceptorFn = (req: HttpRequest<unknown>, ne
           catchError(refreshErr => {
             isRefreshing = false;
             auth.logout();
+            router.navigate(['/auth/login']);
             return throwError(() => refreshErr);
           }),
         );

@@ -436,6 +436,6 @@ export class AppComponent {
   logout(): void {
     this.menuOpen.set(false);
     this.auth.logout();
-    this.router.navigate(['/']);
+    this.router.navigate(['/auth/login']);
   }
 }
