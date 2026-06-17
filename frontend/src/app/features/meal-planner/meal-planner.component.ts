@@ -38,10 +38,8 @@ interface DayPlan {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function mealImg(title: string, _mealType: string | null): string {
-  // picsum gives a deterministic photo per seed — no API key needed, always loads
-  const seed = encodeURIComponent(title.toLowerCase().replace(/\s+/g, '-'));
-  return `https://picsum.photos/seed/${seed}/400/300`;
+function mealImg(_title: string, _mealType: string | null): string {
+  return ''; // replaced by TheMealDB lookup at runtime
 }
 
 function hasPantry(name: string, pantry: string[]): boolean {
@@ -280,7 +278,7 @@ function buildPlan(recipes: ApiRecipe[], pantry: string[], offsetWeeks: number):
                     </div>
                     @if (getMeal(day, mt.key); as meal) {
                       <div class="meal-card-mobile" (click)="openMealDetail(meal)">
-                        <img [src]="meal.imageUrl" class="meal-card-mobile-img"
+                        <img [src]="imageMap()[meal.title] || fallbackImg" class="meal-card-mobile-img"
                              (error)="$any($event.target).src = fallbackImg">
                         <div class="meal-card-mobile-overlay">
                           <div class="d-flex align-items-start justify-content-between mb-auto">
@@ -337,7 +335,7 @@ function buildPlan(recipes: ApiRecipe[], pantry: string[], offsetWeeks: number):
                 @if (getMeal(day, mt.key); as meal) {
                   <div class="meal-card" [class.meal-locked]="meal.locked"
                     (click)="openMealDetail(meal)">
-                    <img [src]="meal.imageUrl" class="meal-card-img"
+                    <img [src]="imageMap()[meal.title] || fallbackImg" class="meal-card-img"
                          (error)="$any($event.target).src = fallbackImg">
                     <div class="meal-card-gradient"></div>
                     <div class="meal-card-content">
@@ -531,7 +529,7 @@ function buildPlan(recipes: ApiRecipe[], pantry: string[], offsetWeeks: number):
     <div class="modal-backdrop" (click)="detailMeal.set(null)">
       <div class="meal-detail-modal" (click)="$event.stopPropagation()">
         <div class="meal-detail-img-wrap">
-          <img [src]="detailMeal()!.imageUrl" class="meal-detail-img"
+          <img [src]="imageMap()[detailMeal()!.title] || fallbackImg" class="meal-detail-img"
                (error)="$any($event.target).src = fallbackImg">
           <div class="meal-detail-img-overlay">
             <div class="d-flex flex-wrap gap-2 mb-2">
@@ -966,6 +964,14 @@ export class MealPlannerComponent implements OnInit {
   readonly Math        = Math;
   readonly fallbackImg = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&auto=format&fit=crop&q=80';
 
+  // ── Image loading (TheMealDB, free, no key) ───────────────────────────────
+  imageMap = signal<Record<string, string>>({});
+  private imgCache = new Map<string, string | null>();
+  private readonly IMG_STOP = new Set([
+    'with','and','the','a','an','in','on','at','of','for','from',
+    'spicy','creamy','fried','grilled','baked','roasted','homemade','easy','quick',
+  ]);
+
   readonly mealTypes = [
     { key: 'breakfast' as const, label: 'Breakfast', icon: 'free_breakfast' },
     { key: 'lunch'     as const, label: 'Lunch',     icon: 'lunch_dining'   },
@@ -1023,6 +1029,38 @@ export class MealPlannerComponent implements OnInit {
     return `This week's plan is optimized for ${this.healthGoal === 'all' ? 'balanced nutrition' : this.healthGoal.replace('-',' ')}. Estimated budget: $${this.weeklyBudget()}.`;
   });
 
+  private fetchMealImage(title: string): void {
+    if (!title || this.imgCache.has(title)) return;
+    const words = title.toLowerCase().split(/\s+/).map(w => w.replace(/[(),.]/, ''));
+    const kw = words.filter(w => !this.IMG_STOP.has(w) && w.length > 2);
+    const queries = [title, ...(kw.length >= 2 ? [kw.slice(0, 2).join(' ')] : []), ...(kw.length >= 1 ? [kw[0]] : [])];
+
+    const tryNext = (idx: number) => {
+      if (idx >= queries.length) { this.imgCache.set(title, null); return; }
+      this.http.get<any>('https://www.themealdb.com/api/json/v1/1/search.php', {
+        params: { s: queries[idx] },
+      }).pipe(catchError(() => of(null))).subscribe(data => {
+        const meals = data?.meals;
+        if (meals?.length > 0) {
+          const url: string = meals[0].strMealThumb;
+          this.imgCache.set(title, url);
+          this.imageMap.update(prev => ({ ...prev, [title]: url }));
+        } else { tryNext(idx + 1); }
+      });
+    };
+    tryNext(0);
+  }
+
+  private loadImagesForPlan(plan: DayPlan[]): void {
+    const titles = new Set<string>();
+    for (const d of plan) {
+      if (d.breakfast) titles.add(d.breakfast.title);
+      if (d.lunch)     titles.add(d.lunch.title);
+      if (d.dinner)    titles.add(d.dinner.title);
+    }
+    for (const t of titles) this.fetchMealImage(t);
+  }
+
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit() {
     const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -1038,7 +1076,9 @@ export class MealPlannerComponent implements OnInit {
     forkJoin({ recipes: recipes$, pantry: pantry$ }).subscribe(({ recipes, pantry }) => {
       this.allRecipes  = recipes as ApiRecipe[];
       this.pantryNames = (pantry as PantryItem[]).map(p => p.ingredient_name.toLowerCase());
-      this.weekPlan.set(buildPlan(this.allRecipes, this.pantryNames, this.weekOffset()));
+      const plan = buildPlan(this.allRecipes, this.pantryNames, this.weekOffset());
+      this.weekPlan.set(plan);
+      this.loadImagesForPlan(plan);
       this.loading.set(false);
     });
   }
@@ -1055,6 +1095,7 @@ export class MealPlannerComponent implements OnInit {
         if (current[i]?.dinner?.locked)    day.dinner    = current[i].dinner;
       });
       this.weekPlan.set(newPlan);
+      this.loadImagesForPlan(newPlan);
       this.regenerating.set(false);
     }, 900);
   }
