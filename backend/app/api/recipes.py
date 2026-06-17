@@ -1,7 +1,9 @@
+import asyncio
 import json
 import re
 import uuid
 from typing import List, Optional
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +20,38 @@ from app.services.embedding_service import get_openai_client
 from app.config import settings
 
 router = APIRouter(prefix="/recipes", tags=["recipes"])
+
+_STOP_WORDS = {'with', 'and', 'the', 'a', 'an', 'in', 'on', 'at', 'of', 'for',
+               'from', 'spicy', 'creamy', 'fried', 'grilled', 'baked', 'roasted',
+               'homemade', 'easy', 'quick', 'simple', 'classic'}
+
+
+async def _fetch_meal_db_image(title: str) -> str | None:
+    """Search The Meal DB (free, no API key) for a recipe image URL.
+    Tries progressively looser queries to maximise hit rate."""
+    words = [w.strip('(),.').lower() for w in title.split()]
+    keywords = [w for w in words if w not in _STOP_WORDS and len(w) > 2]
+
+    queries: list[str] = [title]
+    if len(keywords) >= 2:
+        queries.append(' '.join(keywords[:2]))
+    if keywords:
+        queries.append(keywords[0])
+
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            for query in queries:
+                resp = await client.get(
+                    "https://www.themealdb.com/api/json/v1/1/search.php",
+                    params={"s": query},
+                )
+                if resp.status_code == 200:
+                    meals = resp.json().get("meals")
+                    if meals:
+                        return meals[0]["strMealThumb"]
+    except Exception:
+        pass
+    return None
 
 
 class PantryRecipeRequest(BaseModel):
@@ -228,6 +262,7 @@ async def generate_recipe(
             for ri in recipe.recipe_ingredients
             if ri.ingredient
         ]
+        img = recipe.image_url or await _fetch_meal_db_image(recipe.title)
         return GeneratedRecipeOut(
             id=str(recipe.id),
             is_ai_generated=False,
@@ -245,7 +280,7 @@ async def generate_recipe(
             dietary_labels=recipe.dietary_labels or [],
             health_benefits=recipe.health_benefits or [],
             ailment_tags=recipe.ailment_tags or [],
-            image_url=recipe.image_url,
+            image_url=img,
         )
 
     # Not found in DB — generate with AI
@@ -336,10 +371,12 @@ Instructions must be 7–10 complete, detailed sentences — no numbering prefix
     except (json.JSONDecodeError, AttributeError):
         raise HTTPException(status_code=502, detail="AI returned an invalid response. Please try again.")
     ings = [AiIngredientOut(**i) for i in data.get("ingredients", [])]
+    generated_title = data.get("title", q_clean)
+    img = await _fetch_meal_db_image(generated_title)
     return GeneratedRecipeOut(
         id=None,
         is_ai_generated=True,
-        title=data.get("title", q_clean),
+        title=generated_title,
         description=data.get("description"),
         prep_time_minutes=data.get("prep_time_minutes"),
         cook_time_minutes=data.get("cook_time_minutes"),
@@ -353,7 +390,7 @@ Instructions must be 7–10 complete, detailed sentences — no numbering prefix
         dietary_labels=data.get("dietary_labels", []),
         health_benefits=data.get("health_benefits", []),
         ailment_tags=data.get("ailment_tags", []),
-        image_url=None,
+        image_url=img,
     )
 
 
@@ -419,7 +456,17 @@ Rules:
         # OpenAI json_object always returns an object; unwrap if needed
         if isinstance(data, dict):
             data = data.get("recipes", list(data.values())[0] if data else [])
-        return data[:3]
+        recipes = data[:3]
+
+        # Fetch images for all recipes in parallel
+        images = await asyncio.gather(
+            *[_fetch_meal_db_image(r.get("name", "")) for r in recipes],
+            return_exceptions=True,
+        )
+        for r, img in zip(recipes, images):
+            r["image_url"] = img if isinstance(img, str) else None
+
+        return recipes
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Recipe generation failed: {e}")
 
@@ -486,7 +533,9 @@ Rules:
             max_tokens=1400,
         )
         raw = response.choices[0].message.content or "{}"
-        return json.loads(raw)
+        result = json.loads(raw)
+        result["image_url"] = await _fetch_meal_db_image(result.get("name", q))
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Recipe generation failed: {e}")
 

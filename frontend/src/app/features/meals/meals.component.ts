@@ -25,6 +25,7 @@ interface RecipeDetail {
   nutritional_info: Record<string, number> | null;
   cooking_tips: string[];
   is_ai_generated: boolean;
+  image_url: string | null;
 }
 
 interface DefaultCard { title: string; cuisine: string; time: number; icon: string; }
@@ -72,6 +73,7 @@ function apiToDetail(r: ApiRecipe): RecipeDetail {
     nutritional_info: r.nutritional_info,
     cooking_tips: [],
     is_ai_generated: false,
+    image_url: r.image_url,
   };
 }
 
@@ -91,6 +93,7 @@ function genToDetail(r: any): RecipeDetail {
     nutritional_info: r.nutritional_info ?? null,
     cooking_tips: r.cooking_tips ?? [],
     is_ai_generated: !!r.is_ai_generated,
+    image_url: r.image_url ?? null,
   };
 }
 
@@ -109,6 +112,7 @@ function claudeCardToDetail(r: any): RecipeDetail {
     nutritional_info: null,
     cooking_tips: [],
     is_ai_generated: true,
+    image_url: r.image_url ?? null,
   };
 }
 
@@ -206,7 +210,11 @@ function claudeCardToDetail(r: any): RecipeDetail {
           <div class="card-list mt-2">
             @for (m of pantryMatches(); track m.recipe.id) {
               <div class="recipe-card" (click)="openPantryDetail(m.recipe)">
-                <div class="card-icon"><i class="ti ti-bowl-chopsticks"></i></div>
+                @if (imgSrc(m.recipe.title, m.recipe.image_url); as src) {
+                  <img [src]="src" [alt]="m.recipe.title" class="card-thumb">
+                } @else {
+                  <div class="card-icon"><i class="ti ti-bowl-chopsticks"></i></div>
+                }
                 <div class="card-body">
                   <div class="card-name">{{ m.recipe.title }}</div>
                   <div class="card-meta">
@@ -234,7 +242,11 @@ function claudeCardToDetail(r: any): RecipeDetail {
           <div class="card-list mt-2">
             @for (r of pantryAiRecipes(); track r.name) {
               <div class="recipe-card" (click)="openAiPantryDetail(r)">
-                <div class="card-icon"><i class="ti ti-{{ r.icon || 'bowl-chopsticks' }}"></i></div>
+                @if (imgSrc(r.name, r.image_url); as src) {
+                  <img [src]="src" [alt]="r.name" class="card-thumb">
+                } @else {
+                  <div class="card-icon"><i class="ti ti-{{ r.icon || 'bowl-chopsticks' }}"></i></div>
+                }
                 <div class="card-body">
                   <div class="card-name">{{ r.name }}</div>
                   <div class="card-meta">
@@ -307,9 +319,11 @@ function claudeCardToDetail(r: any): RecipeDetail {
           <div class="card-list mt-2">
             @for (d of defaultExplore; track d.title) {
               <div class="recipe-card" (click)="fetchAndShowDetail(d.title)">
-                <div class="card-icon">
-                  <i class="ti ti-{{ d.icon }}"></i>
-                </div>
+                @if (recipeImages()[d.title]; as src) {
+                  <img [src]="src" [alt]="d.title" class="card-thumb">
+                } @else {
+                  <div class="card-icon"><i class="ti ti-{{ d.icon }}"></i></div>
+                }
                 <div class="card-body">
                   <div class="card-name">{{ d.title }}</div>
                   <div class="card-meta">
@@ -331,9 +345,15 @@ function claudeCardToDetail(r: any): RecipeDetail {
   <!-- ══ SHARED DETAIL TEMPLATE ══════════════════════════════════════════════ -->
   <ng-template #detailTpl let-r>
     <div class="detail-header">
-      <div class="detail-icon-wrap">
-        <i class="ti ti-bowl-chopsticks detail-main-icon"></i>
-      </div>
+      @if (imgSrc(r.title, r.image_url); as src) {
+        <div class="detail-img-wrap">
+          <img [src]="src" [alt]="r.title" class="detail-hero">
+        </div>
+      } @else {
+        <div class="detail-icon-wrap">
+          <i class="ti ti-bowl-chopsticks detail-main-icon"></i>
+        </div>
+      }
       <h2 class="detail-name">{{ r.title }}</h2>
       <div class="detail-header-row">
         @if (r.is_ai_generated) {
@@ -559,6 +579,9 @@ function claudeCardToDetail(r: any): RecipeDetail {
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0; font-size: 24px; color: var(--green);
     }
+    .card-thumb {
+      width: 50px; height: 50px; border-radius: 14px; object-fit: cover; flex-shrink: 0;
+    }
     .card-body { flex: 1; min-width: 0; }
     .card-name { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 5px; }
     .card-meta { display: flex; gap: 12px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
@@ -609,6 +632,10 @@ function claudeCardToDetail(r: any): RecipeDetail {
 
     /* Detail header */
     .detail-header { text-align: center; margin-bottom: 24px; }
+    .detail-img-wrap {
+      width: 100%; height: 220px; border-radius: 16px; overflow: hidden; margin: 0 0 16px;
+    }
+    .detail-hero { width: 100%; height: 100%; object-fit: cover; display: block; }
     .detail-icon-wrap {
       width: 68px; height: 68px; border-radius: 22px; background: var(--green-l);
       display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;
@@ -746,6 +773,54 @@ export class MealsComponent implements OnInit {
 
   readonly defaultExplore = DEFAULT_EXPLORE;
 
+  // ── Images ────────────────────────────────────────────────────────────────
+  recipeImages = signal<Record<string, string | null>>({});
+  private mealDbCache = new Map<string, string | null>();
+
+  private readonly MEAL_DB_STOP = new Set([
+    'with','and','the','a','an','in','on','at','of','for','from',
+    'spicy','creamy','fried','grilled','baked','roasted','homemade','easy','quick',
+  ]);
+
+  fetchMealImage(title: string): void {
+    if (!title) return;
+    if (this.mealDbCache.has(title)) {
+      const cached = this.mealDbCache.get(title) ?? null;
+      this.recipeImages.update(prev => ({ ...prev, [title]: cached }));
+      return;
+    }
+
+    const words = title.toLowerCase().split(/\s+/).map(w => w.replace(/[(),.]/, ''));
+    const keywords = words.filter(w => !this.MEAL_DB_STOP.has(w) && w.length > 2);
+    const queries = [title];
+    if (keywords.length >= 2) queries.push(keywords.slice(0, 2).join(' '));
+    if (keywords.length >= 1) queries.push(keywords[0]);
+
+    const tryNext = (idx: number) => {
+      if (idx >= queries.length) {
+        this.mealDbCache.set(title, null);
+        return;
+      }
+      this.http.get<any>('https://www.themealdb.com/api/json/v1/1/search.php', {
+        params: { s: queries[idx] },
+      }).pipe(catchError(() => of(null))).subscribe(data => {
+        const meals = data?.meals;
+        if (meals?.length > 0) {
+          const url: string = meals[0].strMealThumb;
+          this.mealDbCache.set(title, url);
+          this.recipeImages.update(prev => ({ ...prev, [title]: url }));
+        } else {
+          tryNext(idx + 1);
+        }
+      });
+    };
+    tryNext(0);
+  }
+
+  imgSrc(title: string, image_url: string | null): string | null {
+    return image_url || this.recipeImages()[title] || null;
+  }
+
   // ── Lifecycle ────────────────────────────────────────────────────────────
   ngOnInit() {
     if (this.auth.isLoggedIn()) {
@@ -753,6 +828,11 @@ export class MealsComponent implements OnInit {
       this.loadPantry();
     } else {
       this.pantryLoading.set(false);
+    }
+
+    // Preload images for default explore cards
+    for (const card of DEFAULT_EXPLORE) {
+      this.fetchMealImage(card.title);
     }
 
     // If navigated here from Meal Planner's "View Full Recipe", auto-open the detail
@@ -775,6 +855,10 @@ export class MealsComponent implements OnInit {
             .subscribe(recipes => {
               this.pantryRecipes.set(recipes);
               this.pantryLoading.set(false);
+              // Preload images for recipes that don't have one stored
+              for (const r of recipes) {
+                if (!r.image_url) this.fetchMealImage(r.title);
+              }
               // If no DB matches, fall back to AI-generated suggestions
               if (recipes.length === 0) {
                 this.loadPantryAiFallback(items);
