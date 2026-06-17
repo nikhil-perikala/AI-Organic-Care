@@ -18,31 +18,43 @@ export interface TokenOut {
   token_type: string;
 }
 
+const USER_KEY = 'current_user';
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private http = inject(HttpClient);
   private readonly apiUrl = environment.apiUrl;
 
   currentUser = signal<UserOut | null>(null);
-  isLoggedIn = signal(false);
+  isLoggedIn  = signal(false);
 
   constructor() {
-    if (this.getAccessToken()) {
-      // Optimistically mark as logged in so the navbar shows immediately.
-      // fetchMe() will populate the user details; auth failures will logout.
-      this.isLoggedIn.set(true);
+    if (!this.getAccessToken()) return;
 
-      this.fetchMe().subscribe({
-        next: user => this.currentUser.set(user),
-        error: (err) => {
-          // Only clear session on definitive auth failure (401/403).
-          // Network errors or 5xx should not log the user out.
-          if (err?.status === 401 || err?.status === 403) {
-            this.logout();
-          }
-        },
-      });
+    // 1. Restore user from cache instantly — no network flash.
+    const cached = localStorage.getItem(USER_KEY);
+    if (cached) {
+      try {
+        this.currentUser.set(JSON.parse(cached));
+      } catch {}
     }
+    this.isLoggedIn.set(true);
+
+    // 2. Validate token and refresh user data from backend.
+    //    The interceptor handles 401 → token refresh → retry automatically.
+    this.fetchMe().subscribe({
+      next: user => {
+        this.currentUser.set(user);
+        localStorage.setItem(USER_KEY, JSON.stringify(user));
+      },
+      error: (err) => {
+        // Only fully sign out on definitive auth failures.
+        // Network errors / 5xx keep the cached session alive.
+        if (err?.status === 401 || err?.status === 403) {
+          this.logout();
+        }
+      },
+    });
   }
 
   register(email: string, password: string, fullName?: string): Observable<UserOut> {
@@ -63,7 +75,10 @@ export class AuthService {
         localStorage.setItem('refresh_token', tokens.refresh_token);
         this.isLoggedIn.set(true);
         this.fetchMe().subscribe({
-          next: user => this.currentUser.set(user),
+          next: user => {
+            this.currentUser.set(user);
+            localStorage.setItem(USER_KEY, JSON.stringify(user));
+          },
           error: () => {},
         });
       })
@@ -72,7 +87,6 @@ export class AuthService {
 
   refreshToken(): Observable<TokenOut> {
     const refresh_token = localStorage.getItem('refresh_token') ?? '';
-
     return this.http.post<TokenOut>(`${this.apiUrl}/auth/refresh`, {
       refresh_token,
     }).pipe(
@@ -83,9 +97,10 @@ export class AuthService {
     );
   }
 
-  logout() {
+  logout(): void {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    localStorage.removeItem(USER_KEY);
     this.currentUser.set(null);
     this.isLoggedIn.set(false);
   }
