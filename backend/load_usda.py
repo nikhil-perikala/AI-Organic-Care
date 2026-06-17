@@ -26,28 +26,22 @@ BASE_URL = "https://api.nal.usda.gov/fdc/v1"
 # SR Legacy: ~8,000 classic USDA reference foods
 DATA_TYPES = ["Foundation", "SR Legacy"]
 
-# USDA nutrient IDs
-NUTRIENT_CALORIES = 1008   # Energy (kcal)
-NUTRIENT_PROTEIN  = 1003   # Protein (g)
-NUTRIENT_CARBS    = 1005   # Carbohydrates, by difference (g)
-NUTRIENT_FAT      = 1004   # Total lipids / fat (g)
-
-WANTED_NUTRIENTS = [NUTRIENT_CALORIES, NUTRIENT_PROTEIN, NUTRIENT_CARBS, NUTRIENT_FAT]
+# USDA nutrient "number" strings (as returned in the abridged API response)
+NUTRIENT_CALORIES = "208"   # Energy (kcal)
+NUTRIENT_PROTEIN  = "203"   # Protein (g)
+NUTRIENT_FAT      = "204"   # Total lipids / fat (g)
+NUTRIENT_CARBS    = "205"   # Carbohydrates, by difference (g)
 
 PAGE_SIZE   = 200   # max allowed by USDA API
 BATCH_SIZE  = 50    # foods per POST /foods request (keep well under limits)
 INSERT_CHUNK = 500  # rows per DB insert
 
 
-def _extract_nutrient(food: dict, nutrient_id: int) -> float | None:
+def _extract_nutrient(food: dict, nutrient_number: str) -> float | None:
+    # Abridged format uses {"number": "208", "amount": 239.0}
     for fn in food.get("foodNutrients", []):
-        # abridged format: {"nutrientId": 1008, "value": 239.0}
-        # full format: {"nutrient": {"id": 1008}, "amount": 239.0}
-        nid = fn.get("nutrientId") or fn.get("nutrient", {}).get("id")
-        if nid == nutrient_id:
-            val = fn.get("value")
-            if val is None:
-                val = fn.get("amount")
+        if fn.get("number") == nutrient_number:
+            val = fn.get("amount")
             return float(val) if val is not None else None
     return None
 
@@ -117,18 +111,12 @@ async def main() -> None:
         # Fetch nutrition details in batches
         rows_to_insert: list[tuple] = []
         total_batches = (len(fdc_ids) + BATCH_SIZE - 1) // BATCH_SIZE
-        _printed_sample = False
 
         for i in range(0, len(fdc_ids), BATCH_SIZE):
             batch_ids = fdc_ids[i : i + BATCH_SIZE]
             batch_num = i // BATCH_SIZE + 1
             try:
                 foods = await fetch_food_details(client, batch_ids)
-                if not _printed_sample and foods:
-                    f0 = foods[0]
-                    print(f"\nDEBUG keys: {list(f0.keys())}")
-                    print(f"DEBUG foodNutrients[:2]: {f0.get('foodNutrients', [])[:2]}\n")
-                    _printed_sample = True
                 for food in foods:
                     rows_to_insert.append((
                         food["fdcId"],
