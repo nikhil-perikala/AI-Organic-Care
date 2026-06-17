@@ -41,9 +41,14 @@ INSERT_CHUNK = 500  # rows per DB insert
 
 def _extract_nutrient(food: dict, nutrient_id: int) -> float | None:
     for fn in food.get("foodNutrients", []):
+        # abridged format: {"nutrientId": 1008, "value": 239.0}
+        # full format: {"nutrient": {"id": 1008}, "amount": 239.0}
         nid = fn.get("nutrientId") or fn.get("nutrient", {}).get("id")
         if nid == nutrient_id:
-            return fn.get("value") or fn.get("amount")
+            val = fn.get("value")
+            if val is None:
+                val = fn.get("amount")
+            return float(val) if val is not None else None
     return None
 
 
@@ -150,7 +155,12 @@ async def main() -> None:
                 INSERT INTO food_ai_search
                     (fdc_id, description, data_type, calories, protein, carbs, fat)
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
-                ON CONFLICT (fdc_id) DO NOTHING
+                ON CONFLICT (fdc_id) DO UPDATE SET
+                    description = EXCLUDED.description,
+                    calories    = EXCLUDED.calories,
+                    protein     = EXCLUDED.protein,
+                    carbs       = EXCLUDED.carbs,
+                    fat         = EXCLUDED.fat
                 """,
                 chunk,
             )
