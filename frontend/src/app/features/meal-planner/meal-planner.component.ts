@@ -229,7 +229,11 @@ function weekRange(): string {
         </div>
 
         <!-- Results -->
-        @if (searchError()) {
+        @if (isSearching()) {
+          <div class="sg-loading">
+            <i class="ti ti-loader-2 spin"></i> Finding meals…
+          </div>
+        } @else if (searchError()) {
           <p class="search-error"><i class="ti ti-alert-circle"></i> {{ searchError() }}</p>
         } @else if (suggestions().length > 0) {
           <div class="sg-grid">
@@ -241,7 +245,9 @@ function weekRange(): string {
                   <span><i class="ti ti-clock"></i> {{ s.time }}</span>
                 </div>
                 <div class="sg-desc">{{ s.desc }}</div>
-                <div class="sg-benefit"><i class="ti ti-leaf"></i> {{ s.benefit }}</div>
+                @if (s.benefit) {
+                  <div class="sg-benefit"><i class="ti ti-leaf"></i> {{ s.benefit }}</div>
+                }
                 <button class="sg-add-btn"
                         [style.background]="MEAL_COLOR[activeSlot()!.meal]"
                         (click)="selectSuggestion(s)">
@@ -250,6 +256,8 @@ function weekRange(): string {
               </div>
             }
           </div>
+        } @else if (hasSearched()) {
+          <p class="sg-empty">No results. Try a different search.</p>
         }
 
         <button class="cancel-btn" (click)="closeModal()">Cancel</button>
@@ -529,6 +537,16 @@ function weekRange(): string {
     }
     .chip:hover { border-color: var(--teal); color: var(--teal); background: #f0faf7; }
 
+    /* Loading / empty states */
+    .sg-loading {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 20px 0; font-size: 13px; color: var(--muted);
+    }
+    .sg-empty {
+      text-align: center; padding: 18px 0;
+      font-size: 13px; color: var(--muted);
+    }
+
     /* Error */
     .search-error {
       display: flex; align-items: center; gap: 7px;
@@ -645,9 +663,10 @@ export class MealPlannerComponent implements AfterViewInit {
   activeSlot  = signal<{ day: string; meal: MealType } | null>(null);
   filledSlot  = signal<{ day: string; meal: MealType } | null>(null);
   searchQuery = '';
-  suggestions = signal<Meal[]>([]);
-  isSearching = signal(false);
-  searchError = signal('');
+  suggestions  = signal<Meal[]>([]);
+  isSearching  = signal(false);
+  searchError  = signal('');
+  hasSearched  = signal(false);
 
   streak = 5;
 
@@ -761,6 +780,7 @@ export class MealPlannerComponent implements AfterViewInit {
     this.filledSlot.set(null);
     this.suggestions.set([]);
     this.searchError.set('');
+    this.hasSearched.set(false);
     this.searchQuery = '';
   }
 
@@ -774,6 +794,7 @@ export class MealPlannerComponent implements AfterViewInit {
     this.filledSlot.set(null);
     this.suggestions.set([]);
     this.searchError.set('');
+    this.hasSearched.set(false);
     this.searchQuery = '';
   }
 
@@ -789,6 +810,7 @@ export class MealPlannerComponent implements AfterViewInit {
 
     this.isSearching.set(true);
     this.searchError.set('');
+    this.hasSearched.set(false);
     this.suggestions.set([]);
 
     this.http.post<Meal[]>(`${environment.apiUrl}/ai/meal-suggest`, {
@@ -797,10 +819,15 @@ export class MealPlannerComponent implements AfterViewInit {
       count:     4,
     }).pipe(catchError(() => {
       this.searchError.set('Could not load results. Try again.');
-      return of([]);
-    })).subscribe(list => {
-      this.suggestions.set(Array.isArray(list) ? list : []);
       this.isSearching.set(false);
+      this.hasSearched.set(true);
+      return of(null);
+    })).subscribe(list => {
+      if (list !== null) {
+        this.suggestions.set(Array.isArray(list) ? list : []);
+        this.isSearching.set(false);
+        this.hasSearched.set(true);
+      }
     });
   }
 
