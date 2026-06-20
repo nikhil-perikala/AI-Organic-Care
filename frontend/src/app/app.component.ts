@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, NgZone } from '@angular/core';
 import { RouterOutlet, RouterLink, Router, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
@@ -211,6 +211,20 @@ const NAV_CENTER: NavTab = {
         <app-chat-widget />
       }
 
+      <!-- Auto-logout idle warning -->
+      @if (showIdleWarning()) {
+        <div class="idle-backdrop">
+          <div class="idle-card">
+            <div class="idle-icon">⏱</div>
+            <div class="idle-text">
+              <div class="idle-title">Session expiring soon</div>
+              <div class="idle-sub">You'll be signed out in <strong>{{ idleSecondsLeft() }}s</strong> due to inactivity.</div>
+            </div>
+            <button class="idle-btn" (click)="stayLoggedIn()">Stay logged in</button>
+          </div>
+        </div>
+      }
+
     </div>
   `,
   styles: [`
@@ -388,20 +402,121 @@ const NAV_CENTER: NavTab = {
         padding-bottom: 0;
       }
     }
+
+    /* ── Idle warning ──────────────────────────────── */
+    .idle-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: 9999;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 0 16px 24px;
+      animation: fadeInBackdrop 0.25s ease-out;
+    }
+
+    .idle-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 20px 20px 20px 18px;
+      max-width: 420px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+      border-left: 4px solid #f9a825;
+      animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .idle-icon {
+      font-size: 28px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .idle-text {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .idle-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1a2a1a;
+      margin-bottom: 3px;
+    }
+
+    .idle-sub {
+      font-size: 12px;
+      color: #757575;
+      line-height: 1.4;
+    }
+
+    .idle-sub strong {
+      color: #e65100;
+      font-size: 13px;
+    }
+
+    .idle-btn {
+      flex-shrink: 0;
+      background: linear-gradient(135deg, #2e7d32, #1b5e20);
+      color: #fff;
+      border: none;
+      border-radius: 20px;
+      padding: 9px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 2px 8px rgba(46, 125, 50, 0.3);
+    }
+
+    .idle-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(46, 125, 50, 0.4);
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(60px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    @keyframes fadeInBackdrop {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
   `],
 })
-export class AppComponent {
-  auth = inject(AuthService);
+export class AppComponent implements OnInit, OnDestroy {
+  auth   = inject(AuthService);
   router = inject(Router);
+  private zone = inject(NgZone);
 
-  navLeft = NAV_LEFT;
-  navRight = NAV_RIGHT;
+  navLeft   = NAV_LEFT;
+  navRight  = NAV_RIGHT;
   navCenter = NAV_CENTER;
 
   allNavItems: NavTab[] = [...this.navLeft, this.navCenter, ...this.navRight];
 
-  menuOpen = signal(false);
+  menuOpen    = signal(false);
   activeRoute = signal('/');
+
+  // ── Idle session ────────────────────────────────────────────────────────────
+  showIdleWarning = signal(false);
+  idleSecondsLeft = signal(60);
+
+  private readonly IDLE_MS = 5 * 60 * 1000;   // 5 minutes total idle
+  private readonly WARN_MS = 4 * 60 * 1000;   // warn after 4 min (1 min to logout)
+
+  private warnTimer:        ReturnType<typeof setTimeout>  | null = null;
+  private logoutTimer:      ReturnType<typeof setTimeout>  | null = null;
+  private countdownInterval: ReturnType<typeof setInterval> | null = null;
+
+  private readonly activityEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+  private readonly onActivity = () => this.resetIdleTimer();
 
   constructor() {
     this.router.events
@@ -411,20 +526,76 @@ export class AppComponent {
       });
   }
 
+  ngOnInit() {
+    this.zone.runOutsideAngular(() => {
+      this.activityEvents.forEach(ev =>
+        document.addEventListener(ev, this.onActivity, { passive: true })
+      );
+    });
+    if (this.auth.isLoggedIn()) this.resetIdleTimer();
+  }
+
+  ngOnDestroy() {
+    this.activityEvents.forEach(ev =>
+      document.removeEventListener(ev, this.onActivity)
+    );
+    this.clearIdleTimers();
+  }
+
+  private resetIdleTimer() {
+    if (!this.auth.isLoggedIn()) return;
+    this.clearIdleTimers();
+
+    this.zone.run(() => {
+      if (this.showIdleWarning()) {
+        this.showIdleWarning.set(false);
+      }
+    });
+
+    this.zone.runOutsideAngular(() => {
+      this.warnTimer = setTimeout(() => {
+        this.zone.run(() => {
+          this.showIdleWarning.set(true);
+          this.idleSecondsLeft.set(60);
+          this.countdownInterval = setInterval(() => {
+            this.zone.run(() => {
+              const left = this.idleSecondsLeft() - 1;
+              this.idleSecondsLeft.set(left);
+            });
+          }, 1000);
+        });
+      }, this.WARN_MS);
+
+      this.logoutTimer = setTimeout(() => {
+        this.zone.run(() => {
+          this.clearIdleTimers();
+          this.logout();
+        });
+      }, this.IDLE_MS);
+    });
+  }
+
+  private clearIdleTimers() {
+    if (this.warnTimer)        { clearTimeout(this.warnTimer);         this.warnTimer = null; }
+    if (this.logoutTimer)      { clearTimeout(this.logoutTimer);       this.logoutTimer = null; }
+    if (this.countdownInterval){ clearInterval(this.countdownInterval); this.countdownInterval = null; }
+  }
+
+  stayLoggedIn() {
+    this.resetIdleTimer();
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+
   isActive(route: string): boolean {
     const current = this.activeRoute();
-
-    if (route === '/') {
-      return current === '/' || current === '';
-    }
-
+    if (route === '/') return current === '/' || current === '';
     return current.startsWith(route);
   }
 
   initials(): string {
     const user = this.auth.currentUser();
     const name = user?.full_name || user?.email || '?';
-
     return name
       .split(/[\s@]/)
       .map(word => word[0])
@@ -434,6 +605,8 @@ export class AppComponent {
   }
 
   logout(): void {
+    this.clearIdleTimers();
+    this.showIdleWarning.set(false);
     this.menuOpen.set(false);
     this.auth.logout();
     this.router.navigate(['/auth/login']);
