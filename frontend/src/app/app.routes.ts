@@ -56,6 +56,18 @@ export const routes: Routes = [
     loadComponent: () => import('./features/profile/profile.component').then(m => m.ProfileComponent),
     canActivate: [authGuard],
   },
+  // ── Info / static pages ───────────────────────────────────────────────────
+  ...[
+    'about', 'mission', 'careers', 'blog',
+    'contact', 'help', 'faqs', 'feedback',
+    'terms', 'privacy', 'cookies', 'disclaimer',
+  ].map(slug => ({
+    path: slug,
+    loadComponent: () =>
+      import('./features/info/info-page.component').then(m => m.InfoPageComponent),
+    data: { slug },
+  })),
+
   { path: 'home', redirectTo: '' },
   { path: '**', redirectTo: '' },
 ];

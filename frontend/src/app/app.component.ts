@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from './core/services/auth.service';
 import { ChatWidgetComponent } from './features/home/chat-widget.component';
+import { FooterComponent } from './shared/footer.component';
 import { filter } from 'rxjs/operators';
 
 interface NavTab {
@@ -30,7 +31,7 @@ const NAV_CENTER: NavTab = {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, CommonModule, MatIconModule, ChatWidgetComponent],
+  imports: [RouterOutlet, RouterLink, CommonModule, MatIconModule, ChatWidgetComponent, FooterComponent],
   template: `
     <div class="app-shell">
 
@@ -170,6 +171,9 @@ const NAV_CENTER: NavTab = {
 
       <main class="page-content flex-fill overflow-auto">
         <router-outlet />
+        @if (!activeRoute().startsWith('/auth') && !isActive('/chat')) {
+          <app-footer />
+        }
       </main>
 
       <nav class="bottom-nav d-flex d-md-none bg-white">
