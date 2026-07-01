@@ -77,7 +77,7 @@ interface SocialLink { label: string; abbr: string; href: string; color: string;
     <div class="contact-row">
       <a href="mailto:support@organiccare.ai" class="contact-item">
         <mat-icon class="contact-icon">email</mat-icon>
-        <span>support@organiccare.ai</span>
+        <span>support&#64;organiccare.ai</span>
       </a>
       <div class="contact-item">
         <mat-icon class="contact-icon">location_on</mat-icon>
