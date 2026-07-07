@@ -995,7 +995,9 @@ export class PantryComponent implements OnInit, OnDestroy {
     );
     if (cat)    list = list.filter(i => i.category === cat);
     if (status) list = list.filter(i => statusOf(i) === status);
-    return list;
+    return [...list].sort((a, b) =>
+      new Date(b.added_at).getTime() - new Date(a.added_at).getTime()
+    );
   });
 
   expiringSoon = computed(() => {
