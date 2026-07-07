@@ -2,6 +2,7 @@ import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -97,7 +98,7 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
   standalone: true,
   imports: [
     CommonModule, FormsModule, ReactiveFormsModule,
-    MatIconModule, MatSnackBarModule,
+    MatIconModule, MatProgressSpinnerModule, MatSnackBarModule,
     MatAutocompleteModule, MatTooltipModule,
   ],
   template: `
