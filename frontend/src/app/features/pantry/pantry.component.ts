@@ -517,8 +517,6 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
     </div>
   </div>
 }
-
-<!-- ════════════════════════════════════════════════════════════
   `,
   styles: [`
     .pantry-page { padding: 20px 16px 80px; background: #f7f9f7; min-height: 100vh; }
