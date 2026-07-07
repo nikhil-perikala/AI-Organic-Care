@@ -514,37 +514,6 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
           </div>
         }
 
-        <!-- Pantry Insights -->
-        <div class="card border-0 shadow-sm" style="border-radius:14px">
-          <div class="card-body p-3">
-            <div class="d-flex align-items-center gap-2 mb-3 fw-bold" style="font-size:14px">
-              <mat-icon style="color:#2e7d32;font-size:18px">bar_chart</mat-icon> Pantry Insights
-            </div>
-            <div class="row g-2">
-              <div class="col-4">
-                <div class="rounded-3 p-3 d-flex flex-column gap-1" style="background:#fff8f0">
-                  <div class="fw-bold" style="font-size:22px;color:#f57c00">{{ expiringSoon().length }}</div>
-                  <div class="text-muted" style="font-size:12px;line-height:1.3">Items expiring soon</div>
-                  <button class="btn btn-link p-0 text-start fw-semibold" style="font-size:12px;color:#f57c00" (click)="filterExpiring()">View items →</button>
-                </div>
-              </div>
-              <div class="col-4">
-                <div class="rounded-3 p-3 d-flex flex-column gap-1" style="background:#f0f4ff">
-                  <div class="fw-bold" style="font-size:22px;color:#1565c0">{{ lowStock().length }}</div>
-                  <div class="text-muted" style="font-size:12px;line-height:1.3">Items low in stock</div>
-                  <button class="btn btn-link p-0 text-start fw-semibold" style="font-size:12px;color:#1565c0" (click)="filterLowStock()">Restock now →</button>
-                </div>
-              </div>
-              <div class="col-4">
-                <div class="rounded-3 p-3 d-flex flex-column gap-1" style="background:#f5f0ff">
-                  <div class="fw-bold" style="font-size:22px;color:#6a1b9a">{{ items().length > 0 ? '31%' : '—' }}</div>
-                  <div class="text-muted" style="font-size:12px;line-height:1.3">Reduce waste</div>
-                  <button class="btn btn-link p-0 text-start fw-semibold" style="font-size:12px;color:#6a1b9a" (click)="goToAI()">Learn how →</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
 
       </div>
     </div>
