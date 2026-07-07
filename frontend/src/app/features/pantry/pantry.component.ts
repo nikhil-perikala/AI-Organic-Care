@@ -1,14 +1,12 @@
-import { Component, inject, signal, computed, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, of, takeUntil, catchError, map } from 'rxjs';
-import { PantryService, PantryItem, UsdaFood, ExtractedItem } from '../../core/services/pantry.service';
+import { PantryService, PantryItem, UsdaFood } from '../../core/services/pantry.service';
 
 // Local ingredient list used as instant fallback when the API is unavailable
 const LOCAL_INGREDIENTS = [
@@ -99,7 +97,7 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
   standalone: true,
   imports: [
     CommonModule, FormsModule, ReactiveFormsModule,
-    MatIconModule, MatProgressSpinnerModule, MatSnackBarModule,
+    MatIconModule, MatSnackBarModule,
     MatAutocompleteModule, MatTooltipModule,
   ],
   template: `
@@ -117,13 +115,6 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
           </div>
         </div>
         <div class="d-flex gap-2 align-items-center flex-wrap">
-          <!-- Upload Receipt Button -->
-          <button class="btn fw-semibold d-flex align-items-center gap-2 px-3 py-2"
-            style="background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border-radius:10px;font-size:13px;border:none;box-shadow:0 2px 8px rgba(46,125,50,.3)"
-            (click)="openReceiptModal()">
-            <mat-icon style="font-size:18px;width:18px;height:18px;line-height:1">receipt_long</mat-icon>
-            Upload Receipt
-          </button>
           <div class="rounded-3 px-3 py-2 text-center" style="background:#f8faf8;min-width:100px">
             <div class="text-muted" style="font-size:11px">Total Items</div>
             <div class="fw-bold" style="font-size:18px">{{ items().length }}</div>
@@ -259,38 +250,6 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
           </div>
         </div>
 
-        <!-- Scan Receipt card -->
-        <div class="card border-0 shadow-sm position-relative overflow-hidden" style="border-radius:16px;cursor:pointer"
-          (click)="openReceiptModal()">
-          <div class="card-body p-3" style="background:linear-gradient(135deg,#e8f5e9,#f1f8e9)">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <div class="rounded-3 d-flex align-items-center justify-content-center"
-                style="width:38px;height:38px;background:linear-gradient(135deg,#2e7d32,#43a047);flex-shrink:0">
-                <mat-icon style="color:#fff;font-size:20px;width:20px;height:20px;line-height:1">receipt_long</mat-icon>
-              </div>
-              <div>
-                <div class="fw-bold" style="font-size:14px;color:#1a2a1a">Scan Receipt</div>
-                <div class="text-muted" style="font-size:11px">AI-powered grocery extraction</div>
-              </div>
-            </div>
-            <p class="text-muted small mb-3" style="font-size:12px;line-height:1.4">
-              Upload or photograph your grocery receipt — AI extracts all items and adds them to your pantry instantly.
-            </p>
-            <div class="d-flex gap-2">
-              <span class="badge rounded-pill fw-normal" style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;font-size:11px">
-                <mat-icon style="font-size:12px;vertical-align:middle">upload</mat-icon> Upload
-              </span>
-              <span class="badge rounded-pill fw-normal" style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;font-size:11px">
-                <mat-icon style="font-size:12px;vertical-align:middle">photo_camera</mat-icon> Camera
-              </span>
-              <span class="badge rounded-pill fw-normal" style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;font-size:11px">
-                <mat-icon style="font-size:12px;vertical-align:middle">picture_as_pdf</mat-icon> PDF
-              </span>
-            </div>
-            <span class="position-absolute" style="bottom:6px;right:12px;font-size:36px;opacity:.12" aria-hidden="true">🧾</span>
-          </div>
-        </div>
-
         <!-- Quick Add -->
         <div class="card border-0 shadow-sm" style="border-radius:16px">
           <div class="card-body p-3">
@@ -302,22 +261,6 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
                 </button>
               }
             </div>
-          </div>
-        </div>
-
-        <!-- AI Pantry Assistant -->
-        <div class="card border-0 shadow-sm position-relative overflow-hidden" style="border-radius:16px;background:linear-gradient(135deg,#f1f8e9,#e8f5e9)">
-          <div class="card-body p-3">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <span style="font-size:22px">🤖</span>
-              <div>
-                <span class="fw-bold" style="font-size:14px">AI Pantry Assistant</span>
-                <span class="badge ms-1 fw-bold" style="background:#e8f5e9;color:#2e7d32;font-size:9px">Beta</span>
-              </div>
-            </div>
-            <p class="text-muted small mb-3">I can help you reduce waste and suggest recipes based on what you have!</p>
-            <button class="btn btn-outline-primary btn-sm fw-semibold" (click)="goToAI()">Ask AI Assistant</button>
-            <span class="position-absolute" style="bottom:8px;right:14px;font-size:32px;opacity:.15" aria-hidden="true">🌿</span>
           </div>
         </div>
 
@@ -388,14 +331,6 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
             <p class="text-muted mt-3 mb-2">
               {{ items().length === 0 ? 'Your pantry is empty. Add ingredients or scan a receipt!' : 'No items match your search.' }}
             </p>
-            @if (items().length === 0) {
-              <button class="btn btn-sm fw-semibold mx-auto"
-                style="background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border-radius:8px"
-                (click)="openReceiptModal()">
-                <mat-icon style="font-size:16px;vertical-align:middle">receipt_long</mat-icon>
-                Scan a Receipt
-              </button>
-            }
           </div>
         } @else if (viewMode === 'table') {
           <div class="card border-0 shadow-sm" style="border-radius:14px;overflow:hidden">
@@ -521,12 +456,6 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
   </div>
 </div>
 
-<!-- Hidden file inputs -->
-<input #fileInput type="file" accept="image/jpeg,image/png,image/webp,application/pdf"
-  style="display:none" (change)="onFileInput($event)">
-<input #cameraInput type="file" accept="image/*" capture="environment"
-  style="display:none" (change)="onFileInput($event)">
-
 <!-- ════════════════════════════════════════════════════════════
      Edit Modal
      ════════════════════════════════════════════════════════════ -->
@@ -590,231 +519,6 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
 }
 
 <!-- ════════════════════════════════════════════════════════════
-     Receipt Scanner Modal
-     ════════════════════════════════════════════════════════════ -->
-@if (receiptOpen()) {
-  <div class="modal-overlay" (click)="closeReceiptModal()">
-    <div class="receipt-modal card border-0 shadow-lg" (click)="$event.stopPropagation()" style="border-radius:20px">
-
-      <!-- Header -->
-      <div class="card-body p-4 pb-0">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <div class="d-flex align-items-center gap-2">
-            <div class="rounded-3 d-flex align-items-center justify-content-center"
-              style="width:36px;height:36px;background:linear-gradient(135deg,#2e7d32,#43a047)">
-              <mat-icon style="color:#fff;font-size:20px;width:20px;height:20px;line-height:1">receipt_long</mat-icon>
-            </div>
-            <div>
-              <div class="fw-bold" style="font-size:16px">Upload Receipt</div>
-              <div class="text-muted" style="font-size:11px">AI extracts grocery items automatically</div>
-            </div>
-          </div>
-          <button class="btn btn-sm btn-light rounded-circle p-1" (click)="closeReceiptModal()">
-            <mat-icon style="font-size:20px;color:#9e9e9e;line-height:1;display:block">close</mat-icon>
-          </button>
-        </div>
-
-        <!-- Step indicator -->
-        <div class="d-flex align-items-center gap-2 mt-3 mb-3">
-          <div class="step-dot" [class.active]="receiptStep() === 1" [class.done]="receiptStep() > 1">1</div>
-          <div class="step-line" [class.done]="receiptStep() > 1"></div>
-          <div class="step-dot" [class.active]="receiptStep() === 2" [class.done]="receiptStep() > 2">2</div>
-          <div class="step-line" [class.done]="receiptStep() > 2"></div>
-          <div class="step-dot" [class.active]="receiptStep() === 3">3</div>
-          <div class="ms-2 text-muted" style="font-size:11px">
-            @if (receiptStep() === 1) { Upload Receipt }
-            @else if (receiptStep() === 2) { Scanning... }
-            @else { Review Items }
-          </div>
-        </div>
-      </div>
-
-      <div class="card-body p-4 pt-2" style="overflow-y:auto;max-height:60vh">
-
-        <!-- ── Step 1: Upload / Camera ───────────────────────────── -->
-        @if (receiptStep() === 1) {
-          <!-- Drag & drop zone -->
-          <div class="drop-zone rounded-3 p-4 text-center mb-3"
-            [class.drag-over]="dragOver()"
-            (dragover)="onDragOver($event)"
-            (dragleave)="onDragLeave()"
-            (drop)="onDrop($event)"
-            (click)="fileInput.click()">
-            <div style="font-size:40px;margin-bottom:8px">🧾</div>
-            <div class="fw-semibold" style="font-size:14px;color:#2e7d32">Drop your receipt here</div>
-            <div class="text-muted" style="font-size:12px;margin-top:4px">or click to browse files</div>
-            <div class="text-muted mt-2" style="font-size:11px">Supports: JPG, PNG, WebP, PDF · Max 10 MB</div>
-          </div>
-
-          <!-- OR divider + Camera button -->
-          <div class="d-flex align-items-center gap-2 mb-3">
-            <div style="flex:1;height:1px;background:#e0e0e0"></div>
-            <span class="text-muted" style="font-size:12px">or</span>
-            <div style="flex:1;height:1px;background:#e0e0e0"></div>
-          </div>
-
-          <div class="row g-2">
-            <div class="col-6">
-              <button class="btn w-100 fw-semibold d-flex align-items-center justify-content-center gap-2 py-3"
-                style="background:#f8faf8;border:1.5px dashed #c8e6c9;border-radius:12px;font-size:13px;color:#2e7d32"
-                (click)="fileInput.click()">
-                <mat-icon style="font-size:20px;width:20px;height:20px;line-height:1">upload_file</mat-icon>
-                Upload File
-              </button>
-            </div>
-            <div class="col-6">
-              <button class="btn w-100 fw-semibold d-flex align-items-center justify-content-center gap-2 py-3"
-                style="background:#f8faf8;border:1.5px dashed #c8e6c9;border-radius:12px;font-size:13px;color:#2e7d32"
-                (click)="cameraInput.click()">
-                <mat-icon style="font-size:20px;width:20px;height:20px;line-height:1">photo_camera</mat-icon>
-                Use Camera
-              </button>
-            </div>
-          </div>
-
-          <div class="mt-3 rounded-3 p-2 d-flex gap-2 align-items-start"
-            style="background:#f1f8e9;font-size:11px;color:#388e3c">
-            <mat-icon style="font-size:14px;flex-shrink:0;margin-top:1px">tips_and_updates</mat-icon>
-            <span>For best results, ensure the receipt is flat, well-lit, and fully visible. Phone camera works great on mobile!</span>
-          </div>
-        }
-
-        <!-- ── Step 2: Scanning Animation ────────────────────────── -->
-        @if (receiptStep() === 2) {
-          <div class="text-center py-4">
-            @if (receiptPreview()) {
-              <div class="position-relative d-inline-block mb-4">
-                <img [src]="receiptPreview()!" alt="Receipt preview"
-                  style="max-height:200px;max-width:100%;border-radius:12px;object-fit:contain;box-shadow:0 4px 16px rgba(0,0,0,.15)">
-                <div class="scan-line"></div>
-              </div>
-            } @else {
-              <div class="mb-4" style="font-size:60px">📄</div>
-            }
-            <mat-spinner diameter="36" style="margin:0 auto 12px"></mat-spinner>
-            <div class="fw-semibold" style="font-size:15px;color:#1a2a1a">Scanning Receipt...</div>
-            <div class="text-muted mt-1" style="font-size:12px">AI is extracting grocery items</div>
-            <div class="scanning-dots mt-2">
-              <span></span><span></span><span></span>
-            </div>
-          </div>
-        }
-
-        <!-- ── Step 3: Review Extracted Items ────────────────────── -->
-        @if (receiptStep() === 3) {
-          @if (extractedItems().length === 0) {
-            <div class="text-center py-4">
-              <div style="font-size:40px">🤔</div>
-              <div class="fw-semibold mt-2" style="font-size:14px">No grocery items found</div>
-              <p class="text-muted small mt-1">The AI couldn't identify grocery items in this receipt. Try uploading a clearer image.</p>
-              <button class="btn btn-outline-success btn-sm mt-2" (click)="resetReceipt()">Try Again</button>
-            </div>
-          } @else {
-            <!-- Preview image + count -->
-            <div class="d-flex align-items-center gap-3 mb-3">
-              @if (receiptPreview()) {
-                <img [src]="receiptPreview()!" alt="Receipt"
-                  style="width:56px;height:72px;object-fit:cover;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.12)">
-              }
-              <div>
-                <div class="fw-bold" style="font-size:15px;color:#2e7d32">
-                  ✓ {{ extractedItems().length }} item{{ extractedItems().length !== 1 ? 's' : '' }} found
-                </div>
-                <div class="text-muted" style="font-size:12px">Review and edit before adding to pantry</div>
-              </div>
-              <button class="btn btn-sm btn-light ms-auto fw-semibold" style="font-size:12px" (click)="resetReceipt()">
-                <mat-icon style="font-size:14px;vertical-align:middle">refresh</mat-icon> Rescan
-              </button>
-            </div>
-
-            <!-- Extracted items list -->
-            <div class="d-flex flex-column gap-2">
-              @for (item of extractedItems(); track $index) {
-                <div class="extracted-item rounded-3 p-3 position-relative"
-                  style="background:#f8faf8;border:1.5px solid #e8f0e8">
-                  <div class="d-flex align-items-center gap-2 mb-2">
-                    <span style="font-size:18px">{{ catEmoji(inferCat(item.ingredient_name)) }}</span>
-                    <input class="form-control form-control-sm fw-semibold"
-                      style="font-size:13px;border:none;background:transparent;padding:0;box-shadow:none;color:#1a2a1a"
-                      [value]="item.ingredient_name"
-                      (change)="updateExtracted($index, 'ingredient_name', $any($event.target).value)"
-                      placeholder="Item name">
-                    <button class="btn btn-sm p-0 ms-auto flex-shrink-0" style="color:#bdbdbd;line-height:1"
-                      (click)="removeExtracted($index)" [matTooltip]="'Remove ' + item.ingredient_name">
-                      <mat-icon style="font-size:18px;display:block">close</mat-icon>
-                    </button>
-                  </div>
-                  <div class="row g-2">
-                    <div class="col-4">
-                      <label class="form-label fw-semibold mb-1" style="font-size:10px;color:#9e9e9e;text-transform:uppercase">Qty</label>
-                      <input class="form-control form-control-sm" type="text" inputmode="decimal"
-                        style="font-size:12px"
-                        [value]="item.quantity ?? ''"
-                        (change)="updateExtracted($index, 'quantity', $any($event.target).value)"
-                        placeholder="—">
-                    </div>
-                    <div class="col-4">
-                      <label class="form-label fw-semibold mb-1" style="font-size:10px;color:#9e9e9e;text-transform:uppercase">Unit</label>
-                      <select class="form-select form-select-sm" style="font-size:12px"
-                        [value]="item.unit ?? ''"
-                        (change)="updateExtracted($index, 'unit', $any($event.target).value)">
-                        <option value="">—</option>
-                        @for (u of units; track u) { <option [value]="u">{{ u }}</option> }
-                      </select>
-                    </div>
-                    <div class="col-4">
-                      <label class="form-label fw-semibold mb-1" style="font-size:10px;color:#9e9e9e;text-transform:uppercase">Expiry</label>
-                      <input class="form-control form-control-sm" type="date"
-                        style="font-size:12px"
-                        [value]="item.expiry_date ?? ''"
-                        (change)="updateExtracted($index, 'expiry_date', $any($event.target).value)">
-                    </div>
-                  </div>
-                </div>
-              }
-            </div>
-
-            <!-- Add item button -->
-            <button class="btn btn-outline-success btn-sm mt-2 w-100" style="border-style:dashed;font-size:12px"
-              (click)="addBlankExtracted()">
-              <mat-icon style="font-size:14px;vertical-align:middle">add</mat-icon>
-              Add another item
-            </button>
-          }
-        }
-
-      </div>
-
-      <!-- Footer actions -->
-      <div class="card-body pt-2 pb-4 px-4 border-top d-flex gap-2 justify-content-end flex-wrap">
-        @if (receiptStep() === 1 || receiptStep() === 2) {
-          <button class="btn btn-light fw-semibold" (click)="closeReceiptModal()" [disabled]="receiptScanning()">
-            Cancel
-          </button>
-        }
-        @if (receiptStep() === 3) {
-          <button class="btn btn-light fw-semibold" (click)="closeReceiptModal()">
-            Cancel
-          </button>
-          @if (extractedItems().length > 0) {
-            <button class="btn fw-bold d-flex align-items-center gap-2"
-              style="background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none"
-              [disabled]="receiptSaving()"
-              (click)="confirmAddToPantry()">
-              @if (receiptSaving()) {
-                <span class="spinner-border spinner-border-sm"></span>
-              } @else {
-                <mat-icon style="font-size:18px;width:18px;height:18px;line-height:1">add_shopping_cart</mat-icon>
-              }
-              Add {{ extractedItems().length }} Item{{ extractedItems().length !== 1 ? 's' : '' }} to Pantry
-            </button>
-          }
-        }
-      </div>
-
-    </div>
-  </div>
-}
   `,
   styles: [`
     .pantry-page { padding: 20px 16px 80px; background: #f7f9f7; min-height: 100vh; }
@@ -894,12 +598,9 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
   `],
 })
 export class PantryComponent implements OnInit, OnDestroy {
-  @ViewChild('fileInput')   fileInput!: ElementRef<HTMLInputElement>;
-  @ViewChild('cameraInput') cameraInput!: ElementRef<HTMLInputElement>;
 
   private pantryService = inject(PantryService);
   private snackBar      = inject(MatSnackBar);
-  private router        = inject(Router);
   private fb            = inject(FormBuilder);
   private destroy$      = new Subject<void>();
   private search$       = new Subject<string>();
@@ -919,14 +620,6 @@ export class PantryComponent implements OnInit, OnDestroy {
   statusFilter = signal<'expiring' | 'expired' | ''>('');
   viewMode: 'table' | 'grid' = 'table';
 
-  // ── Receipt scanner state ──────────────────────────────────────────────────
-  receiptOpen     = signal(false);
-  receiptStep     = signal<1 | 2 | 3>(1);
-  receiptScanning = signal(false);
-  receiptPreview  = signal<string | null>(null);
-  extractedItems  = signal<ExtractedItem[]>([]);
-  receiptSaving   = signal(false);
-  dragOver        = signal(false);
 
   // ── Constants ──────────────────────────────────────────────────────────────
   categories       = CATEGORIES;
@@ -1132,148 +825,7 @@ export class PantryComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ── Receipt Scanner ────────────────────────────────────────────────────────
-
-  openReceiptModal() {
-    this.receiptOpen.set(true);
-    this.receiptStep.set(1);
-    this.receiptPreview.set(null);
-    this.extractedItems.set([]);
-    this.dragOver.set(false);
-  }
-
-  closeReceiptModal() {
-    if (this.receiptScanning()) return;
-    this.receiptOpen.set(false);
-    this.resetReceipt();
-  }
-
-  resetReceipt() {
-    this.receiptStep.set(1);
-    this.receiptPreview.set(null);
-    this.extractedItems.set([]);
-    this.dragOver.set(false);
-    // Clear file inputs so the same file can be re-selected
-    if (this.fileInput?.nativeElement)   this.fileInput.nativeElement.value   = '';
-    if (this.cameraInput?.nativeElement) this.cameraInput.nativeElement.value = '';
-  }
-
-  onFileInput(event: Event) {
-    const file = (event.target as HTMLInputElement).files?.[0];
-    if (file) this.processFile(file);
-  }
-
-  onDragOver(event: DragEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-    this.dragOver.set(true);
-  }
-
-  onDragLeave() {
-    this.dragOver.set(false);
-  }
-
-  onDrop(event: DragEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-    this.dragOver.set(false);
-    const file = event.dataTransfer?.files?.[0];
-    if (file) this.processFile(file);
-  }
-
-  processFile(file: File) {
-    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
-    if (!allowed.includes(file.type) && !file.name.toLowerCase().endsWith('.pdf')) {
-      this.snackBar.open('Unsupported file. Use JPG, PNG, WebP, or PDF.', 'OK', { duration: 4000 });
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      this.snackBar.open('File too large. Maximum size is 10 MB.', 'OK', { duration: 4000 });
-      return;
-    }
-
-    // Generate preview for images
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = e => this.receiptPreview.set(e.target?.result as string);
-      reader.readAsDataURL(file);
-    } else {
-      this.receiptPreview.set(null);
-    }
-
-    // Move to scanning step
-    this.receiptStep.set(2);
-    this.receiptScanning.set(true);
-
-    this.pantryService.uploadReceipt(file).subscribe({
-      next: resp => {
-        this.extractedItems.set(resp.items);
-        this.receiptScanning.set(false);
-        this.receiptStep.set(3);
-      },
-      error: err => {
-        this.receiptScanning.set(false);
-        this.receiptStep.set(1);
-        const msg = err.error?.detail || 'Failed to scan receipt. Please try again.';
-        this.snackBar.open(msg, 'OK', { duration: 5000 });
-      },
-    });
-  }
-
-  updateExtracted(index: number, field: keyof ExtractedItem, value: string) {
-    this.extractedItems.update(items => {
-      const copy = [...items];
-      copy[index] = { ...copy[index], [field]: value || null };
-      return copy;
-    });
-  }
-
-  removeExtracted(index: number) {
-    this.extractedItems.update(items => items.filter((_, i) => i !== index));
-  }
-
-  addBlankExtracted() {
-    this.extractedItems.update(items => [
-      ...items,
-      { ingredient_name: '', quantity: null, unit: null, expiry_date: null },
-    ]);
-  }
-
-  confirmAddToPantry() {
-    const toAdd = this.extractedItems().filter(i => i.ingredient_name.trim());
-    if (!toAdd.length) return;
-
-    this.receiptSaving.set(true);
-    const payload = toAdd.map(i => ({
-      ingredient_name: i.ingredient_name.trim(),
-      quantity:        i.quantity || null,
-      unit:            i.unit     || null,
-      category:        inferCategory(i.ingredient_name) || null,
-      expiry_date:     i.expiry_date || null,
-      storage_tips:    null,
-    }));
-
-    this.pantryService.addBulk(payload).subscribe({
-      next: newItems => {
-        this.items.update(list => [...newItems, ...list]);
-        this.receiptSaving.set(false);
-        this.closeReceiptModal();
-        this.snackBar.open(
-          `✓ ${newItems.length} item${newItems.length !== 1 ? 's' : ''} added to pantry from receipt!`,
-          '',
-          { duration: 3000 },
-        );
-      },
-      error: () => {
-        this.receiptSaving.set(false);
-        this.snackBar.open('Failed to save items. Please try again.', 'OK', { duration: 4000 });
-      },
-    });
-  }
-
   // ── Helpers ────────────────────────────────────────────────────────────────
-
-  inferCat(name: string): string { return inferCategory(name); }
 
   itemStatus(item: PantryItem): 'fresh' | 'expiring' | 'expired' { return statusOf(item); }
 
@@ -1319,7 +871,4 @@ export class PantryComponent implements OnInit, OnDestroy {
     this.statusFilter.set('');
   }
 
-  goToAI() {
-    this.router.navigate(['/recommendations'], { queryParams: { mode: 'pantry' } });
-  }
 }
