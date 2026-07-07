@@ -164,6 +164,56 @@ function getGreeting(): string {
     </div>
   </div>
 
+  <!-- ── S1b: Dashboard summary (logged-in only) ─────────── -->
+  @if (auth.isLoggedIn()) {
+    <div class="px-3 px-md-4 mt-3">
+      <div class="row g-2">
+
+        <!-- Pantry Items -->
+        <div class="col-4">
+          <div class="ps-stat-card bg-white shadow-sm" style="cursor:pointer" (click)="goToPantry()">
+            <div class="ps-stat-icon" style="background:#e8f5e9">
+              <mat-icon style="font-size:16px;color:#2e7d32;width:16px;height:16px;line-height:1">inventory_2</mat-icon>
+            </div>
+            <div class="fw-bold" style="font-size:20px;color:#1a2a1a;line-height:1">{{ pantryCount() }}</div>
+            <div class="text-muted" style="font-size:11px">Pantry Items</div>
+            <span class="ps-pill" style="background:#e8f5e9;color:#2e7d32">View All →</span>
+          </div>
+        </div>
+
+        <!-- Expiring Soon -->
+        <div class="col-4">
+          <div class="ps-stat-card bg-white shadow-sm" style="cursor:pointer" (click)="goToPantry()">
+            <div class="ps-stat-icon" style="background:#fff3e0">
+              <mat-icon style="font-size:16px;color:#f57c00;width:16px;height:16px;line-height:1">schedule</mat-icon>
+            </div>
+            <div class="fw-bold" style="font-size:20px;line-height:1"
+              [style.color]="expiringCount() > 0 ? '#e65100' : '#1a2a1a'">{{ expiringCount() }}</div>
+            <div class="text-muted" style="font-size:11px">Expiring Soon</div>
+            @if (expiringCount() > 0) {
+              <span class="ps-pill" style="background:#fff3e0;color:#e65100">⚠ Use Soon</span>
+            } @else {
+              <span class="ps-pill" style="background:#e8f5e9;color:#2e7d32">✓ All Good</span>
+            }
+          </div>
+        </div>
+
+        <!-- Cook Now CTA -->
+        <div class="col-4">
+          <div class="ps-stat-card shadow-sm" style="background:linear-gradient(135deg,#2e7d32,#43a047);cursor:pointer;border:none"
+            (click)="goToChat()">
+            <div class="ps-stat-icon" style="background:rgba(255,255,255,0.2)">
+              <mat-icon style="font-size:16px;color:#fff;width:16px;height:16px;line-height:1">smart_toy</mat-icon>
+            </div>
+            <div class="fw-bold text-white" style="font-size:13px;line-height:1.2">Cook<br>Now</div>
+            <span class="ps-pill" style="background:rgba(255,255,255,0.2);color:#fff">Ask AI →</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  }
+
   <!-- ── S1b: Hero carousel ───────────────────────────────── -->
   <div class="hero-card mx-3 mx-md-4 mt-3">
     <div class="hero-track" [style.transform]="'translateX(-' + currentHeroSlide() * 100 + '%)'">
@@ -308,7 +358,7 @@ function getGreeting(): string {
         }
       </div>
     } @else if (auth.isLoggedIn() && recipeCards().length === 0) {
-      @if (pantryCount === 0) {
+      @if (pantryCount() === 0) {
         <div class="card border-0 shadow-sm text-center py-5 px-3" style="border-radius:14px;background:#f8fdf8">
           <mat-icon style="font-size:48px;width:48px;height:48px;color:#a5d6a7;margin:0 auto">kitchen</mat-icon>
           <div class="fw-bold mt-3" style="color:#2e7d32;font-size:16px">Your pantry is empty</div>
@@ -417,7 +467,7 @@ function getGreeting(): string {
             </div>
             <div class="d-flex flex-column gap-1 mb-3">
               <div class="d-flex align-items-center gap-2">
-                <span class="fw-bold" style="font-size:22px;color:#2e7d32">{{ pantryCount }}</span>
+                <span class="fw-bold" style="font-size:22px;color:#2e7d32">{{ pantryCount() }}</span>
                 <span class="text-muted" style="font-size:11px">items tracked</span>
               </div>
 
@@ -843,8 +893,9 @@ export class HomeComponent implements OnInit, OnDestroy {
   recipeModalOpen     = signal(false);
   recipeDetailLoading = signal(false);
 
-  recipeCount = 0;
-  pantryCount = 0;
+  recipeCount   = 0;
+  pantryCount   = signal(0);
+  expiringCount = signal(0);
 
   favouriteIds   = this.favSvc.favouriteIds;
   favouriteCards = computed(() => this.favSvc.favouriteRecipes().map(r => recipeToCard(r)));
@@ -909,9 +960,18 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   private loadPantry() {
-    this.http.get<unknown[]>(`${environment.apiUrl}/pantry`)
+    this.http.get<{ expiry_date: string | null }[]>(`${environment.apiUrl}/pantry`)
       .pipe(catchError(() => of([])))
-      .subscribe(items => { this.pantryCount = items.length; });
+      .subscribe(items => {
+        this.pantryCount.set(items.length);
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const expiring = items.filter(i => {
+          if (!i.expiry_date) return false;
+          const diff = Math.ceil((new Date(i.expiry_date + 'T00:00:00').getTime() - today.getTime()) / 86_400_000);
+          return diff >= 0 && diff <= 7;
+        });
+        this.expiringCount.set(expiring.length);
+      });
   }
 
   toggleFavourite(event: Event, recipeId: string) {

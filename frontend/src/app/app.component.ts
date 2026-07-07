@@ -176,40 +176,53 @@ const NAV_CENTER: NavTab = {
         }
       </main>
 
-      <nav class="bottom-nav d-flex d-md-none bg-white">
-        @for (tab of navLeft; track tab.route) {
-          <a class="nav-tab flex-fill d-flex flex-column align-items-center justify-content-center gap-1 text-decoration-none py-2"
-             [routerLink]="tab.route"
-             [class.active]="isActive(tab.route)">
-            <mat-icon style="font-size:22px;width:22px;height:22px">{{ tab.icon }}</mat-icon>
-            <span class="nav-label">{{ tab.label }}</span>
+      @if (!activeRoute().startsWith('/auth')) {
+        <nav class="bottom-nav d-flex d-md-none bg-white">
+
+          <!-- Home -->
+          <a class="nav-tab flex-fill text-decoration-none" routerLink="/" [class.active]="isActive('/')">
+            <div class="nav-tab-inner">
+              <div class="nav-pill"></div>
+              <mat-icon>home</mat-icon>
+              <span class="nav-label">Home</span>
+            </div>
           </a>
-        }
 
-        <a class="nav-center-btn d-flex align-items-center justify-content-center text-decoration-none"
-           [routerLink]="navCenter.route">
-          <mat-icon style="font-size:26px;width:26px;height:26px;color:#fff">
-            {{ navCenter.icon }}
-          </mat-icon>
-        </a>
-
-        @for (tab of navRight; track tab.route) {
-          <a class="nav-tab flex-fill d-flex flex-column align-items-center justify-content-center gap-1 text-decoration-none py-2"
-             [routerLink]="tab.route"
-             [class.active]="isActive(tab.route)">
-            <mat-icon style="font-size:22px;width:22px;height:22px">{{ tab.icon }}</mat-icon>
-            <span class="nav-label">{{ tab.label }}</span>
+          <!-- Pantry -->
+          <a class="nav-tab flex-fill text-decoration-none" routerLink="/pantry" [class.active]="isActive('/pantry')">
+            <div class="nav-tab-inner">
+              <div class="nav-pill"></div>
+              <mat-icon>kitchen</mat-icon>
+              <span class="nav-label">Pantry</span>
+            </div>
           </a>
-        }
 
-        <!-- Pantry tab fills the right slot since only Profile is in navRight -->
-        <a class="nav-tab flex-fill d-flex flex-column align-items-center justify-content-center gap-1 text-decoration-none py-2"
-           routerLink="/pantry"
-           [class.active]="isActive('/pantry')">
-          <mat-icon style="font-size:22px;width:22px;height:22px">kitchen</mat-icon>
-          <span class="nav-label">Pantry</span>
-        </a>
-      </nav>
+          <!-- AI Chat — center CTA -->
+          <a class="nav-center-btn d-flex align-items-center justify-content-center text-decoration-none"
+             [routerLink]="navCenter.route">
+            <mat-icon style="font-size:26px;width:26px;height:26px;color:#fff">{{ navCenter.icon }}</mat-icon>
+          </a>
+
+          <!-- Recipes -->
+          <a class="nav-tab flex-fill text-decoration-none" routerLink="/meals" [class.active]="isActive('/meals')">
+            <div class="nav-tab-inner">
+              <div class="nav-pill"></div>
+              <mat-icon>restaurant_menu</mat-icon>
+              <span class="nav-label">Recipes</span>
+            </div>
+          </a>
+
+          <!-- Profile -->
+          <a class="nav-tab flex-fill text-decoration-none" routerLink="/profile" [class.active]="isActive('/profile')">
+            <div class="nav-tab-inner">
+              <div class="nav-pill"></div>
+              <mat-icon>person</mat-icon>
+              <span class="nav-label">Profile</span>
+            </div>
+          </a>
+
+        </nav>
+      }
 
       @if (!isActive('/chat') && !isActive('/notifications') && !activeRoute().startsWith('/auth')) {
         <app-chat-widget />
@@ -333,28 +346,44 @@ const NAV_CENTER: NavTab = {
 
     .bottom-nav {
       position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
+      bottom: 0; left: 0; right: 0;
       height: 64px;
       z-index: 100;
       border-top: 1px solid #EBEBEB;
-      box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
-      align-items: flex-end;
-      padding-bottom: 8px;
+      box-shadow: 0 -2px 16px rgba(0,0,0,0.07);
+      align-items: center;
     }
 
     .nav-tab {
       color: #BDBDBD;
       font-size: 10px;
       font-weight: 600;
-      position: relative;
-      transition: color 0.2s;
-      padding-bottom: 2px;
+      transition: color 0.18s;
     }
-
+    .nav-tab-inner {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 2px; padding: 6px 0;
+      position: relative;
+    }
+    .nav-tab mat-icon {
+      font-size: 22px; width: 22px; height: 22px;
+      transition: transform 0.18s;
+    }
     .nav-tab.active {
       color: #2E7D32;
+    }
+    .nav-tab.active mat-icon {
+      transform: scale(1.12);
+    }
+    .nav-pill {
+      position: absolute; top: -1px;
+      width: 0; height: 3px;
+      background: #4CAF50; border-radius: 0 0 3px 3px;
+      transition: width 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .nav-tab.active .nav-pill {
+      width: 28px;
     }
 
     .nav-label {
@@ -363,24 +392,19 @@ const NAV_CENTER: NavTab = {
     }
 
     .nav-center-btn {
-      width: 52px;
-      height: 52px;
+      width: 52px; height: 52px;
       border-radius: 50%;
       background: linear-gradient(135deg, #2E7D32, #4CAF50);
-      margin-bottom: 8px;
       flex-shrink: 0;
-      box-shadow: 0 4px 14px rgba(46, 125, 50, 0.45);
+      box-shadow: 0 4px 14px rgba(46,125,50,0.45);
       transition: transform 0.15s, box-shadow 0.15s;
+      margin-bottom: 8px;
     }
-
     .nav-center-btn:hover {
       transform: translateY(-2px);
-      box-shadow: 0 6px 18px rgba(46, 125, 50, 0.5);
+      box-shadow: 0 6px 18px rgba(46,125,50,0.5);
     }
-
-    .nav-center-btn:active {
-      transform: scale(0.94);
-    }
+    .nav-center-btn:active { transform: scale(0.94); }
 
     .fade-in {
       animation: fadeIn 0.25s ease-out;

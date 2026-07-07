@@ -1,5 +1,5 @@
 import {
-  Component, signal, computed, ViewChild, ElementRef,
+  Component, signal, ViewChild, ElementRef,
   AfterViewChecked, NgZone, inject, OnInit,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -579,12 +579,36 @@ export class ChatComponent implements AfterViewChecked, OnInit {
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
+  private readonly CHAT_KEY = 'organic_care_chat_v1';
+
   ngOnInit() {
+    this.restoreFromCache();
     this.loadSuggestions();
     if (this.auth.isLoggedIn()) {
       this.loadHistory();
       this.loadPantryData();
     }
+  }
+
+  private restoreFromCache() {
+    try {
+      const raw = localStorage.getItem(this.CHAT_KEY);
+      if (!raw) return;
+      const msgs: ChatMsg[] = JSON.parse(raw);
+      if (Array.isArray(msgs) && msgs.length > 0) {
+        this.zone.run(() => { this.messages.set(msgs); this.shouldScroll = true; });
+      }
+    } catch {}
+  }
+
+  private saveToCache() {
+    try {
+      const toSave = this.messages()
+        .filter(m => !m.streaming && !m.error)
+        .slice(-60)
+        .map(({ id, dbId, role, content, feedback }) => ({ id, dbId, role, content, feedback }));
+      localStorage.setItem(this.CHAT_KEY, JSON.stringify(toSave));
+    } catch {}
   }
 
   ngAfterViewChecked() {
@@ -610,6 +634,7 @@ export class ChatComponent implements AfterViewChecked, OnInit {
         id: i, dbId: m.id, role: m.role as 'user' | 'assistant', content: m.content,
       }));
       this.zone.run(() => { this.messages.set(msgs); this.shouldScroll = true; });
+      this.saveToCache();
     } catch {}
   }
 
@@ -680,6 +705,7 @@ export class ChatComponent implements AfterViewChecked, OnInit {
 
   async clearHistory() {
     this.messages.set([]);
+    localStorage.removeItem(this.CHAT_KEY);
     const token = this.auth.getAccessToken();
     if (!token) return;
     try {
@@ -768,6 +794,7 @@ export class ChatComponent implements AfterViewChecked, OnInit {
                 this.messages.update(msgs =>
                   msgs.map(m => m.id === aiId ? { ...m, streaming: false, dbId: aiMsgId } : m)
                 );
+                this.saveToCache();
               });
             }
           } catch {}

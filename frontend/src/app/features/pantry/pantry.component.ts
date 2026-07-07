@@ -165,6 +165,7 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
                   formControlName="ingredient_name"
                   [matAutocomplete]="auto"
                   (input)="onSearchInput($event)"
+                  (blur)="autoFillCategory()"
                   placeholder="Search ingredient (e.g. Quinoa)"
                   autocomplete="off">
                 <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onFoodSelected($event)" panelWidth="320px">
@@ -350,7 +351,7 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
                 </thead>
                 <tbody>
                   @for (item of filteredItems(); track item.id) {
-                    <tr>
+                    <tr [class]="'row-' + itemStatus(item)">
                       <td class="ps-3">
                         <div class="d-flex align-items-center gap-2">
                           <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
@@ -373,7 +374,7 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
                       <td>
                         @if (item.expiry_date) {
                           <div style="white-space:nowrap">{{ item.expiry_date | date:'MMM d, y' }}</div>
-                          <div style="font-size:11px;white-space:nowrap"
+                          <div class="fw-semibold" style="font-size:11px;white-space:nowrap"
                             [style.color]="itemStatus(item)==='fresh'?'#2e7d32':itemStatus(item)==='expiring'?'#f57c00':'#c62828'">
                             {{ daysLeftLabel(item) }}
                           </div>
@@ -382,12 +383,10 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
                         }
                       </td>
                       <td>
-                        <span class="badge rounded-pill fw-semibold" style="font-size:11px"
-                          [style.background]="itemStatus(item)==='fresh'?'#e8f5e9':itemStatus(item)==='expiring'?'#fff3e0':!item.expiry_date?'#f5f5f5':'#ffebee'"
-                          [style.color]="itemStatus(item)==='fresh'?'#2e7d32':itemStatus(item)==='expiring'?'#f57c00':!item.expiry_date?'#9e9e9e':'#c62828'">
+                        <span class="status-badge" [class]="'status-' + (item.expiry_date ? itemStatus(item) : 'none')">
                           @if (itemStatus(item) === 'expiring') { ⚠ Expiring Soon }
                           @else if (itemStatus(item) === 'expired') { ✕ Expired }
-                          @else if (!item.expiry_date) { — }
+                          @else if (!item.expiry_date) { No date }
                           @else { ✓ Fresh }
                         </span>
                       </td>
@@ -413,9 +412,9 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
           <div class="row g-3">
             @for (item of filteredItems(); track item.id) {
               <div class="col-6 col-md-4 col-lg-3">
-                <div class="card border-0 shadow-sm h-100 position-relative"
-                  style="border-radius:14px;transition:box-shadow .15s"
-                  [style.border]="itemStatus(item)==='expiring'?'1.5px solid #ffe0b2':''">
+                <div class="card border-0 shadow-sm h-100 position-relative pantry-card"
+                  [class]="'pantry-card card-' + itemStatus(item)">
+                  <div class="card-accent" [class]="'accent-' + itemStatus(item)"></div>
                   <div class="card-body p-3 d-flex flex-column gap-1">
                     <div class="mb-2" style="font-size:28px">{{ catEmoji(item.category) }}</div>
                     <div class="fw-bold" style="font-size:13px;color:#1a2a1a">{{ item.ingredient_name }}</div>
@@ -423,16 +422,17 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
                     <div class="d-flex flex-column gap-1 mt-1" style="font-size:11px;color:#6b7c6b">
                       @if (item.quantity) { <span>{{ item.quantity }} {{ item.unit }}</span> }
                       @if (item.expiry_date) {
-                        <span [style.color]="itemStatus(item)!=='fresh'?'#f57c00':'inherit'">{{ daysLeftLabel(item) }}</span>
+                        <span class="fw-semibold"
+                          [style.color]="itemStatus(item)==='expired'?'#c62828':itemStatus(item)==='expiring'?'#f57c00':'#2e7d32'">
+                          {{ daysLeftLabel(item) }}
+                        </span>
                       }
                       <span style="color:#b0b8b0">Added {{ item.added_at | date:'MMM d, y' }}</span>
                     </div>
-                    <span class="badge rounded-pill mt-auto align-self-start fw-semibold" style="font-size:10px"
-                      [style.background]="itemStatus(item)==='fresh'?'#e8f5e9':itemStatus(item)==='expiring'?'#fff3e0':!item.expiry_date?'#f5f5f5':'#ffebee'"
-                      [style.color]="itemStatus(item)==='fresh'?'#2e7d32':itemStatus(item)==='expiring'?'#f57c00':!item.expiry_date?'#9e9e9e':'#c62828'">
+                    <span class="status-badge mt-auto align-self-start" [class]="'status-' + (item.expiry_date ? itemStatus(item) : 'none')">
                       @if (itemStatus(item) === 'expiring') { ⚠ Expiring }
                       @else if (itemStatus(item) === 'expired') { ✕ Expired }
-                      @else if (!item.expiry_date) { — }
+                      @else if (!item.expiry_date) { No date }
                       @else { ✓ Fresh }
                     </span>
                   </div>
@@ -537,63 +537,33 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
     }
     .modal-card { width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
 
-    /* Receipt modal */
-    .receipt-modal { width: 100%; max-width: 560px; max-height: 92vh; display: flex; flex-direction: column; }
-
     /* Active filter button */
     .active-filter { background: #f57c00 !important; border-color: #f57c00 !important; color: #fff !important; }
 
-    /* Drop zone */
-    .drop-zone {
-      border: 2px dashed #a5d6a7; background: #f8faf8; cursor: pointer;
-      transition: all .2s ease;
-    }
-    .drop-zone:hover, .drop-zone.drag-over {
-      border-color: #2e7d32; background: #f1f8e9;
-      transform: scale(1.01);
-    }
+    /* ── Expiry status: table row left-border stripe ── */
+    tr.row-expired  { border-left: 4px solid #ef5350; background: #fff8f8; }
+    tr.row-expiring { border-left: 4px solid #ffa726; background: #fffaf5; }
+    tr.row-fresh    { border-left: 4px solid #66bb6a; }
 
-    /* Step indicator */
-    .step-dot {
-      width: 24px; height: 24px; border-radius: 50%;
-      background: #e0e0e0; color: #9e9e9e;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 11px; font-weight: 700; flex-shrink: 0;
-      transition: all .3s ease;
-    }
-    .step-dot.active { background: #2e7d32; color: #fff; }
-    .step-dot.done   { background: #a5d6a7; color: #2e7d32; }
-    .step-line {
-      flex: 1; height: 2px; background: #e0e0e0;
-      transition: background .3s ease;
-    }
-    .step-line.done { background: #a5d6a7; }
+    /* ── Expiry status: grid card top accent bar ── */
+    .pantry-card { border-radius: 14px; transition: box-shadow .15s; overflow: hidden; }
+    .card-accent { height: 4px; width: 100%; }
+    .accent-expired  { background: #ef5350; }
+    .accent-expiring { background: #ffa726; }
+    .accent-fresh    { background: #66bb6a; }
+    .card-expired    { background: #fff8f8; }
+    .card-expiring   { background: #fffaf5; }
 
-    /* Scan line animation */
-    @keyframes scanMove {
-      0%   { top: 0; opacity: 1; }
-      100% { top: 100%; opacity: 0; }
+    /* ── Status badge ── */
+    .status-badge {
+      display: inline-flex; align-items: center;
+      padding: 2px 8px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
     }
-    .scan-line {
-      position: absolute; left: 0; right: 0; height: 3px;
-      background: linear-gradient(90deg, transparent, #4caf50, transparent);
-      box-shadow: 0 0 8px rgba(76,175,80,.8);
-      animation: scanMove 2s linear infinite;
-    }
-
-    /* Scanning dots */
-    @keyframes dotBlink { 0%,80%,100% { opacity: 0; } 40% { opacity: 1; } }
-    .scanning-dots span {
-      display: inline-block; width: 6px; height: 6px; border-radius: 50%;
-      background: #4caf50; margin: 0 3px;
-      animation: dotBlink 1.4s infinite;
-    }
-    .scanning-dots span:nth-child(2) { animation-delay: .2s; }
-    .scanning-dots span:nth-child(3) { animation-delay: .4s; }
-
-    /* Extracted item */
-    .extracted-item { transition: box-shadow .15s; }
-    .extracted-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+    .status-fresh    { background: #e8f5e9; color: #2e7d32; }
+    .status-expiring { background: #fff3e0; color: #e65100; }
+    .status-expired  { background: #ffebee; color: #c62828; }
+    .status-none     { background: #f5f5f5; color: #9e9e9e; }
   `],
 })
 export class PantryComponent implements OnInit, OnDestroy {
@@ -725,6 +695,14 @@ export class PantryComponent implements OnInit, OnDestroy {
       const cat = inferCategory(food.description);
       if (cat) this.addForm.patchValue({ category: cat });
     }
+  }
+
+  autoFillCategory() {
+    if (this.addForm.value.category) return;
+    const name = this.addForm.value.ingredient_name?.trim() ?? '';
+    if (!name) return;
+    const cat = inferCategory(name);
+    if (cat) this.addForm.patchValue({ category: cat });
   }
 
   // ── CRUD ───────────────────────────────────────────────────────────────────
