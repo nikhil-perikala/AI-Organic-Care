@@ -112,23 +112,33 @@ async def remove_pantry_item(
 
 # ── Receipt OCR endpoint ───────────────────────────────────────────────────────
 
-_RECEIPT_PROMPT = """You are a grocery receipt parser. Extract only food and grocery items from this receipt.
+_RECEIPT_PROMPT = """You are a grocery receipt and shopping list parser. Extract every food and grocery item, including its weight or quantity.
 
 Return ONLY a valid JSON array. No explanation, no markdown, no extra text.
 Each item must be an object with exactly these keys:
-- "ingredient_name": clean readable food name (string)
-- "quantity": numeric quantity (number) or null if unclear
-- "unit": unit of measure string (e.g. "gallon","lb","oz","g","kg","count","bag","box","can","bunch","pack","piece") or null
-- "expiry_date": always null (we cannot know expiry from a receipt)
+- "ingredient_name": clean readable food name ONLY — no numbers, no units, no prices (string)
+- "quantity": the numeric amount as a number (e.g. 500, 1.5, 2) or null if truly absent
+- "unit": unit of measure (e.g. "g","kg","ml","L","lb","oz","gallon","count","bag","box","can","bunch","pack","piece") or null
+- "expiry_date": always null
+
+CRITICAL — always separate weight/quantity from the name:
+- "Chicken Breast 500g"   → ingredient_name: "Chicken Breast",   quantity: 500,  unit: "g"
+- "Whole Milk 2L"         → ingredient_name: "Whole Milk",        quantity: 2,    unit: "L"
+- "Basmati Rice 1kg"      → ingredient_name: "Basmati Rice",      quantity: 1,    unit: "kg"
+- "Tomatoes - 250g"       → ingredient_name: "Tomatoes",          quantity: 250,  unit: "g"
+- "2 LB APPLES"           → ingredient_name: "Apples",            quantity: 2,    unit: "lb"
+- "Eggs x12"              → ingredient_name: "Eggs",              quantity: 12,   unit: "count"
+- "ORG BNNA"              → ingredient_name: "Organic Bananas",   quantity: null, unit: null
+- "Olive Oil 500ml"       → ingredient_name: "Olive Oil",         quantity: 500,  unit: "ml"
 
 Rules:
 - Include ONLY food/grocery items (produce, dairy, meat, pantry staples, beverages, snacks)
-- Exclude: store name, address, phone, cashier, prices, taxes, subtotals, totals, payment method, loyalty points, receipt number, bags, non-food items
-- Clean up abbreviated names (e.g. "ORG BNNA" → "Organic Bananas")
-- quantity should reflect what was purchased (e.g. "2 LB APPLES" → quantity: 2, unit: "lb")
+- Exclude: store name, address, phone, cashier, prices, taxes, subtotals, totals, receipt number, bags, non-food items
+- If weight/size appears anywhere in the line (before or after the name, in parentheses, after a dash), always extract it into quantity + unit
+- Clean up abbreviated or abbreviated names into readable English
 
 Example output:
-[{"ingredient_name":"Whole Milk","quantity":1,"unit":"gallon","expiry_date":null},{"ingredient_name":"Organic Bananas","quantity":2,"unit":"lb","expiry_date":null}]"""
+[{"ingredient_name":"Whole Milk","quantity":2,"unit":"L","expiry_date":null},{"ingredient_name":"Chicken Breast","quantity":500,"unit":"g","expiry_date":null},{"ingredient_name":"Organic Bananas","quantity":3,"unit":"count","expiry_date":null}]"""
 
 
 def _parse_ai_response(content: str) -> list:
