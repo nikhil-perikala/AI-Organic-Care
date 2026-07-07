@@ -79,7 +79,9 @@ export class AuthService {
             this.currentUser.set(user);
             localStorage.setItem(USER_KEY, JSON.stringify(user));
           },
-          error: () => {},
+          error: (err) => {
+            if (err?.status === 401 || err?.status === 403) this.logout();
+          },
         });
       })
     );

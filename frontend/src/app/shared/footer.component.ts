@@ -104,6 +104,7 @@ interface SocialLink { label: string; abbr: string; href: string; color: string;
             name="email"
             placeholder="Enter your email"
             [class.input-error]="showError()"
+            (ngModelChange)="showError.set(false)"
             autocomplete="email">
         </div>
         <button type="submit" class="subscribe-btn">
@@ -477,7 +478,7 @@ export class FooterComponent {
 
   subscribe(e: Event) {
     e.preventDefault();
-    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.email.trim());
+    const valid = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(this.email.trim());
     if (!valid) { this.showError.set(true); return; }
     this.showError.set(false);
     this.subscribed.set(true);

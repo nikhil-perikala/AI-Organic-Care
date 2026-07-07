@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, OnDestroy, NgZone } from '@angular/core';
+import { Component, inject, signal, effect, OnInit, OnDestroy, NgZone } from '@angular/core';
 import { RouterOutlet, RouterLink, Router, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
@@ -528,6 +528,18 @@ export class AppComponent implements OnInit, OnDestroy {
       .subscribe(event => {
         this.activeRoute.set(event.urlAfterRedirects || event.url);
       });
+
+    // Reactively start/stop idle timer whenever login state changes.
+    // Covers the case where the user opens the app on the login page,
+    // logs in, and ngOnInit's one-time check would have missed it.
+    effect(() => {
+      if (this.auth.isLoggedIn()) {
+        this.resetIdleTimer();
+      } else {
+        this.clearIdleTimers();
+        this.showIdleWarning.set(false);
+      }
+    });
   }
 
   ngOnInit() {
@@ -536,7 +548,6 @@ export class AppComponent implements OnInit, OnDestroy {
         document.addEventListener(ev, this.onActivity, { passive: true })
       );
     });
-    if (this.auth.isLoggedIn()) this.resetIdleTimer();
   }
 
   ngOnDestroy() {
