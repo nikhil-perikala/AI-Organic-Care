@@ -406,6 +406,7 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
                     <th class="ps-3">Ingredient <span class="text-muted ms-1" style="font-size:11px">⇅</span></th>
                     <th>Unit <span class="text-muted" style="font-size:11px">⇅</span></th>
                     <th>Qty <span class="text-muted" style="font-size:11px">⇅</span></th>
+                    <th>Added <span class="text-muted" style="font-size:11px">⇅</span></th>
                     <th>Expiry <span class="text-muted" style="font-size:11px">⇅</span></th>
                     <th>Status</th>
                     <th></th>
@@ -430,6 +431,9 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
                       </td>
                       <td class="text-muted">{{ item.unit || '—' }}</td>
                       <td class="text-muted">{{ item.quantity || '—' }}</td>
+                      <td class="text-muted" style="white-space:nowrap">
+                        {{ item.added_at | date:'MMM d, y' }}
+                      </td>
                       <td>
                         @if (item.expiry_date) {
                           <div style="white-space:nowrap">{{ item.expiry_date | date:'MMM d, y' }}</div>
@@ -485,6 +489,7 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
                       @if (item.expiry_date) {
                         <span [style.color]="itemStatus(item)!=='fresh'?'#f57c00':'inherit'">{{ daysLeftLabel(item) }}</span>
                       }
+                      <span style="color:#b0b8b0">Added {{ item.added_at | date:'MMM d, y' }}</span>
                     </div>
                     <span class="badge rounded-pill mt-auto align-self-start fw-semibold" style="font-size:10px"
                       [style.background]="itemStatus(item)==='fresh'?'#e8f5e9':itemStatus(item)==='expiring'?'#fff3e0':!item.expiry_date?'#f5f5f5':'#ffebee'"
