@@ -1,5 +1,6 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { tap } from 'rxjs/operators';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -22,7 +23,8 @@ const USER_KEY = 'current_user';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private http = inject(HttpClient);
+  private http   = inject(HttpClient);
+  private router = inject(Router);
   private readonly apiUrl = environment.apiUrl;
 
   currentUser = signal<UserOut | null>(null);
@@ -105,6 +107,7 @@ export class AuthService {
     localStorage.removeItem(USER_KEY);
     this.currentUser.set(null);
     this.isLoggedIn.set(false);
+    this.router.navigate(['/auth/login']);
   }
 
   fetchMe(): Observable<UserOut> {

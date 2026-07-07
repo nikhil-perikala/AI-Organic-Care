@@ -623,7 +623,6 @@ export class AppComponent implements OnInit, OnDestroy {
     this.clearIdleTimers();
     this.showIdleWarning.set(false);
     this.menuOpen.set(false);
-    this.auth.logout();
-    this.router.navigate(['/auth/login']);
+    this.auth.logout(); // auth.logout() handles navigation to /auth/login
   }
 }
