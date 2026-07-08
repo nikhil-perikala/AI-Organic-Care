@@ -1,4 +1,5 @@
 import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
+import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -136,6 +137,34 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
       </div>
     </div>
   </div>
+
+  <!-- ══ Critical Expiry Alert Banner ═══════════════════════ -->
+  @if (criticalItems().length > 0 && !alertDismissed()) {
+    <div class="expiry-alert mb-3" role="alert">
+      <div class="expiry-alert-inner">
+        <div class="expiry-alert-icon">⏰</div>
+        <div class="flex-fill">
+          <div class="fw-bold" style="font-size:14px;color:#7f1d1d">
+            {{ criticalItems().length }} item{{ criticalItems().length > 1 ? 's' : '' }} expiring very soon!
+          </div>
+          <div style="font-size:12px;color:#991b1b;margin-top:2px">
+            @for (item of criticalItems().slice(0, 3); track item.id; let last = $last) {
+              <span class="fw-semibold">{{ item.ingredient_name }}</span>
+              ({{ daysLeft(item.expiry_date) === 0 ? 'today' : daysLeft(item.expiry_date) + 'd left' }}){{ !last ? ' · ' : '' }}
+            }
+            @if (criticalItems().length > 3) {
+              <span class="text-muted"> +{{ criticalItems().length - 3 }} more</span>
+            }
+          </div>
+        </div>
+        <button class="expiry-alert-btn" (click)="goToChat(criticalItems())">
+          <mat-icon style="font-size:14px;vertical-align:middle">smart_toy</mat-icon>
+          Cook These
+        </button>
+        <button class="btn-close btn-close-sm ms-1" style="opacity:.5;font-size:10px" (click)="dismissAlert()"></button>
+      </div>
+    </div>
+  }
 
   <!-- ══ Main Layout ══════════════════════════════════════════ -->
   <div class="row g-3">
@@ -322,18 +351,37 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
           </div>
         }
 
-        <!-- Loading / empty -->
+        <!-- Loading skeleton -->
         @if (loading()) {
-          <div class="text-center py-5">
-            <mat-spinner diameter="40"></mat-spinner>
+          <div class="card border-0 shadow-sm" style="border-radius:14px;overflow:hidden">
+            @for (sk of [1,2,3,4,5]; track sk) {
+              <div class="skeleton-row" [style.border-top]="sk > 1 ? '1px solid #f0f4f0' : 'none'">
+                <div class="sk-block sk-name"></div>
+                <div class="sk-block sk-tag"></div>
+                <div class="sk-block sk-short"></div>
+                <div class="sk-block sk-short"></div>
+                <div class="sk-block sk-badge"></div>
+              </div>
+            }
           </div>
         } @else if (filteredItems().length === 0) {
-          <div class="card border-0 shadow-sm text-center py-5" style="border-radius:14px">
-            <div style="font-size:40px">🥦</div>
-            <p class="text-muted mt-3 mb-2">
-              {{ items().length === 0 ? 'Your pantry is empty. Add ingredients or scan a receipt!' : 'No items match your search.' }}
-            </p>
-          </div>
+          @if (items().length === 0) {
+            <div class="card border-0 shadow-sm text-center py-4 px-3" style="border-radius:14px">
+              <div style="font-size:48px">🌿</div>
+              <div class="fw-bold mt-3" style="font-size:16px;color:#1a2a1a">Your pantry is empty</div>
+              <p class="text-muted small mt-1 mb-3">Start tracking your ingredients to get personalised recipes and expiry alerts.</p>
+              <button class="btn btn-success px-4 py-2 mx-auto" style="border-radius:12px;font-weight:700;font-size:14px"
+                (click)="showOnboarding.set(true)">
+                <mat-icon style="font-size:16px;vertical-align:middle;margin-right:4px">auto_awesome</mat-icon>
+                Get Started
+              </button>
+            </div>
+          } @else {
+            <div class="card border-0 shadow-sm text-center py-5" style="border-radius:14px">
+              <div style="font-size:40px">🔍</div>
+              <p class="text-muted mt-3 mb-2">No items match your search.</p>
+            </div>
+          }
         } @else if (viewMode === 'table') {
           <div class="card border-0 shadow-sm" style="border-radius:14px;overflow:hidden">
             <div class="table-responsive">
@@ -351,7 +399,7 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
                 </thead>
                 <tbody>
                   @for (item of filteredItems(); track item.id) {
-                    <tr [class]="'row-' + itemStatus(item)">
+                    <tr [class]="'row-' + itemStatus(item)" (click)="openDetail(item)" style="cursor:pointer">
                       <td class="ps-3">
                         <div class="d-flex align-items-center gap-2">
                           <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
@@ -392,11 +440,11 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
                       </td>
                       <td>
                         <div class="d-flex gap-1">
-                          <button class="btn btn-sm btn-light p-1" (click)="openEditModal(item)"
+                          <button class="btn btn-sm btn-light p-1" (click)="$event.stopPropagation(); openEditModal(item)"
                             [matTooltip]="'Edit ' + item.ingredient_name" style="border-radius:6px">
                             <mat-icon style="font-size:16px;color:#1565c0;line-height:1;display:block">edit</mat-icon>
                           </button>
-                          <button class="btn btn-sm btn-light p-1" (click)="removeItem(item.id)"
+                          <button class="btn btn-sm btn-light p-1" (click)="$event.stopPropagation(); removeItem(item.id)"
                             [matTooltip]="'Remove ' + item.ingredient_name" style="border-radius:6px">
                             <mat-icon style="font-size:16px;color:#9e9e9e;line-height:1;display:block">delete_outline</mat-icon>
                           </button>
@@ -413,7 +461,8 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
             @for (item of filteredItems(); track item.id) {
               <div class="col-6 col-md-4 col-lg-3">
                 <div class="card border-0 shadow-sm h-100 position-relative pantry-card"
-                  [class]="'pantry-card card-' + itemStatus(item)">
+                  [class]="'pantry-card card-' + itemStatus(item)"
+                  (click)="openDetail(item)" style="cursor:pointer">
                   <div class="card-accent" [class]="'accent-' + itemStatus(item)"></div>
                   <div class="card-body p-3 d-flex flex-column gap-1">
                     <div class="mb-2" style="font-size:28px">{{ catEmoji(item.category) }}</div>
@@ -437,10 +486,10 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
                     </span>
                   </div>
                   <div class="card-actions position-absolute top-0 end-0 p-1 d-flex gap-1 opacity-0">
-                    <button class="btn btn-sm btn-light p-1" style="border-radius:6px" (click)="openEditModal(item)">
+                    <button class="btn btn-sm btn-light p-1" style="border-radius:6px" (click)="$event.stopPropagation(); openEditModal(item)">
                       <mat-icon style="font-size:14px;color:#1565c0;line-height:1;display:block">edit</mat-icon>
                     </button>
-                    <button class="btn btn-sm btn-light p-1" style="border-radius:6px" (click)="removeItem(item.id)">
+                    <button class="btn btn-sm btn-light p-1" style="border-radius:6px" (click)="$event.stopPropagation(); removeItem(item.id)">
                       <mat-icon style="font-size:14px;color:#9e9e9e;line-height:1;display:block">delete_outline</mat-icon>
                     </button>
                   </div>
@@ -456,6 +505,163 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
 
   </div>
 </div>
+
+<!-- ════════════════════════════════════════════════════════════
+     Onboarding Modal
+     ════════════════════════════════════════════════════════════ -->
+@if (showOnboarding()) {
+  <div class="modal-overlay" (click)="closeOnboarding()">
+    <div class="card border-0 shadow-lg modal-card" style="border-radius:20px;overflow:hidden" (click)="$event.stopPropagation()">
+
+      <!-- Step indicators -->
+      <div class="onboard-steps">
+        @for (s of [0,1,2]; track s) {
+          <div class="onboard-dot" [class.onboard-dot-active]="onboardStep() === s" (click)="onboardStep.set(s)"></div>
+        }
+      </div>
+
+      <!-- Step content -->
+      @if (onboardStep() === 0) {
+        <div class="onboard-body">
+          <div class="onboard-icon">🌿</div>
+          <div class="onboard-title">Track Your Ingredients</div>
+          <div class="onboard-desc">Add what you have in your kitchen. Set expiry dates and get alerts before food goes to waste.</div>
+        </div>
+      } @else if (onboardStep() === 1) {
+        <div class="onboard-body">
+          <div class="onboard-icon">⏰</div>
+          <div class="onboard-title">Never Waste Food Again</div>
+          <div class="onboard-desc">We track expiry dates and alert you when items are about to expire so you can cook them first.</div>
+        </div>
+      } @else {
+        <div class="onboard-body">
+          <div class="onboard-icon">🤖</div>
+          <div class="onboard-title">AI Recipes From Your Pantry</div>
+          <div class="onboard-desc">Ask the AI what to cook with exactly what you have. Personalised recipes, instantly.</div>
+        </div>
+      }
+
+      <!-- Navigation -->
+      <div class="onboard-footer">
+        @if (onboardStep() < 2) {
+          <button class="btn btn-light px-4" style="border-radius:10px" (click)="closeOnboarding()">Skip</button>
+          <button class="btn btn-success px-4" style="border-radius:10px;font-weight:700"
+            (click)="onboardStep.set(onboardStep() + 1)">
+            Next →
+          </button>
+        } @else {
+          <button class="btn btn-success w-100 py-3" style="border-radius:12px;font-size:16px;font-weight:800"
+            (click)="closeOnboarding()">
+            Start Adding Ingredients 🚀
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ════════════════════════════════════════════════════════════
+     Item Detail Panel
+     ════════════════════════════════════════════════════════════ -->
+@if (selectedItem()) {
+  <div class="detail-overlay" (click)="closeDetail()">
+    <div class="detail-panel" (click)="$event.stopPropagation()">
+      <div class="detail-handle"></div>
+
+      <!-- Header -->
+      <div class="detail-header">
+        <div class="detail-emoji">{{ catEmoji(selectedItem()!.category) }}</div>
+        <div class="detail-title-block">
+          <div class="detail-name">{{ selectedItem()!.ingredient_name }}</div>
+          @if (selectedItem()!.category) {
+            <div class="detail-cat">{{ selectedItem()!.category }}</div>
+          }
+        </div>
+        <button class="detail-close" (click)="closeDetail()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <!-- Days bar -->
+      <div class="detail-section">
+        @if (selectedItem()!.expiry_date) {
+          <div class="detail-label">Freshness</div>
+          <div class="days-bar-wrap">
+            <div class="days-bar-track">
+              <div class="days-bar-fill"
+                [style.width]="daysBarPct(selectedItem()!) + '%'"
+                [style.background]="itemStatus(selectedItem()!)==='fresh' ? '#4caf50' : itemStatus(selectedItem()!)==='expiring' ? '#ff9800' : '#f44336'">
+              </div>
+            </div>
+            <div class="days-bar-label"
+              [style.color]="itemStatus(selectedItem()!)==='fresh' ? '#2e7d32' : itemStatus(selectedItem()!)==='expiring' ? '#e65100' : '#c62828'">
+              @if (daysLeft(selectedItem()!.expiry_date) < 0) {
+                Expired {{ -daysLeft(selectedItem()!.expiry_date) }} day{{ -daysLeft(selectedItem()!.expiry_date) !== 1 ? 's' : '' }} ago
+              } @else if (daysLeft(selectedItem()!.expiry_date) === 0) {
+                Expires today!
+              } @else {
+                {{ daysLeft(selectedItem()!.expiry_date) }} day{{ daysLeft(selectedItem()!.expiry_date) !== 1 ? 's' : '' }} left
+              }
+            </div>
+          </div>
+        } @else {
+          <div class="detail-label">Expiry</div>
+          <div class="detail-value text-muted">No expiry date set</div>
+        }
+      </div>
+
+      <!-- Info grid -->
+      <div class="detail-info-grid">
+        @if (selectedItem()!.quantity) {
+          <div class="detail-info-cell">
+            <div class="detail-info-label">Quantity</div>
+            <div class="detail-info-val">{{ selectedItem()!.quantity }} {{ selectedItem()!.unit }}</div>
+          </div>
+        }
+        @if (selectedItem()!.expiry_date) {
+          <div class="detail-info-cell">
+            <div class="detail-info-label">Expiry Date</div>
+            <div class="detail-info-val">{{ selectedItem()!.expiry_date | date:'MMM d, y' }}</div>
+          </div>
+        }
+        <div class="detail-info-cell">
+          <div class="detail-info-label">Added</div>
+          <div class="detail-info-val">{{ selectedItem()!.added_at | date:'MMM d, y' }}</div>
+        </div>
+        <div class="detail-info-cell">
+          <div class="detail-info-label">Status</div>
+          <div class="detail-info-val">
+            <span class="status-badge" [class]="'status-' + (selectedItem()!.expiry_date ? itemStatus(selectedItem()!) : 'none')">
+              @if (itemStatus(selectedItem()!) === 'expiring') { ⚠ Expiring Soon }
+              @else if (itemStatus(selectedItem()!) === 'expired') { ✕ Expired }
+              @else if (!selectedItem()!.expiry_date) { No date }
+              @else { ✓ Fresh }
+            </span>
+          </div>
+        </div>
+      </div>
+
+      @if (selectedItem()!.storage_tips) {
+        <div class="detail-section">
+          <div class="detail-label">Storage Tips</div>
+          <div class="detail-tips">{{ selectedItem()!.storage_tips }}</div>
+        </div>
+      }
+
+      <!-- Actions -->
+      <div class="detail-actions">
+        <button class="detail-ai-btn" (click)="askAIAbout(selectedItem()!)">
+          <mat-icon style="font-size:18px">smart_toy</mat-icon>
+          Ask AI for Recipes
+        </button>
+        <button class="detail-edit-btn" (click)="openEditModal(selectedItem()!); closeDetail()">
+          <mat-icon style="font-size:18px">edit</mat-icon>
+          Edit
+        </button>
+      </div>
+    </div>
+  </div>
+}
 
 <!-- ════════════════════════════════════════════════════════════
      Edit Modal
@@ -540,6 +746,33 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
     /* Active filter button */
     .active-filter { background: #f57c00 !important; border-color: #f57c00 !important; color: #fff !important; }
 
+    /* ── Critical expiry alert banner ── */
+    .expiry-alert {
+      background: linear-gradient(135deg, #fef2f2, #fee2e2);
+      border: 1.5px solid #fca5a5;
+      border-left: 4px solid #ef4444;
+      border-radius: 12px;
+      animation: slideDown 0.3s ease-out;
+    }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .expiry-alert-inner {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px;
+    }
+    .expiry-alert-icon { font-size: 22px; flex-shrink: 0; }
+    .expiry-alert-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #ef4444; color: #fff; border: none;
+      border-radius: 8px; padding: 6px 12px;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      flex-shrink: 0; white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .expiry-alert-btn:hover { background: #dc2626; }
+
     /* ── Expiry status: table row left-border stripe ── */
     tr.row-expired  { border-left: 4px solid #ef5350; background: #fff8f8; }
     tr.row-expiring { border-left: 4px solid #ffa726; background: #fffaf5; }
@@ -564,6 +797,131 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
     .status-expiring { background: #fff3e0; color: #e65100; }
     .status-expired  { background: #ffebee; color: #c62828; }
     .status-none     { background: #f5f5f5; color: #9e9e9e; }
+
+    /* ── Onboarding Modal ── */
+    .onboard-steps {
+      display: flex; justify-content: center; gap: 8px; padding: 20px 0 0;
+    }
+    .onboard-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: #e0e0e0;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .onboard-dot-active { background: #2e7d32; width: 24px; border-radius: 4px; }
+    .onboard-body {
+      display: flex; flex-direction: column; align-items: center; text-align: center;
+      padding: 24px 28px 20px;
+    }
+    .onboard-icon { font-size: 52px; margin-bottom: 16px; }
+    .onboard-title { font-size: 20px; font-weight: 800; color: #1a2a1a; margin-bottom: 10px; }
+    .onboard-desc { font-size: 14px; color: #6b7c6b; line-height: 1.65; max-width: 280px; }
+    .onboard-footer {
+      display: flex; gap: 10px; padding: 0 24px 24px;
+      justify-content: space-between;
+    }
+
+    /* ── Item Detail Panel ── */
+    .detail-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+      z-index: 1050; display: flex; align-items: flex-end;
+      animation: fadeIn 0.2s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .detail-panel {
+      background: #fff; width: 100%; max-height: 85vh; overflow-y: auto;
+      border-radius: 20px 20px 0 0; padding: 0 0 24px;
+      animation: slideUp 0.28s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+    .detail-handle {
+      width: 40px; height: 4px; border-radius: 2px; background: #e0e0e0;
+      margin: 12px auto 0;
+    }
+    .detail-header {
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid #f0f4f0;
+    }
+    .detail-emoji {
+      font-size: 36px; line-height: 1; flex-shrink: 0;
+      background: #f4f9f4; border-radius: 12px;
+      width: 56px; height: 56px; display: flex; align-items: center; justify-content: center;
+    }
+    .detail-title-block { flex: 1; min-width: 0; }
+    .detail-name { font-size: 18px; font-weight: 800; color: #1a2a1a; }
+    .detail-cat  { font-size: 13px; color: #6b7c6b; margin-top: 2px; }
+    .detail-close {
+      width: 36px; height: 36px; border-radius: 50%; border: none;
+      background: #f5f5f5; cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      mat-icon { font-size: 20px; color: #9e9e9e; }
+      &:hover { background: #e8e8e8; }
+    }
+    .detail-section { padding: 14px 20px; border-bottom: 1px solid #f0f4f0; }
+    .detail-label { font-size: 11px; font-weight: 700; color: #9e9e9e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .detail-value { font-size: 14px; color: #1a2a1a; }
+    .days-bar-wrap { }
+    .days-bar-track {
+      height: 8px; background: #f0f4f0; border-radius: 4px; overflow: hidden; margin-bottom: 6px;
+    }
+    .days-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+    .days-bar-label { font-size: 13px; font-weight: 700; }
+    .detail-info-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0; border-bottom: 1px solid #f0f4f0;
+    }
+    .detail-info-cell {
+      padding: 12px 20px;
+      &:nth-child(odd) { border-right: 1px solid #f0f4f0; }
+    }
+    .detail-info-label { font-size: 11px; font-weight: 700; color: #9e9e9e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .detail-info-val   { font-size: 14px; font-weight: 600; color: #1a2a1a; }
+    .detail-tips {
+      font-size: 13px; color: #4a5a4a; line-height: 1.6;
+      background: #f4f9f4; border-radius: 10px; padding: 10px 14px;
+    }
+    .detail-actions {
+      display: flex; gap: 12px; padding: 16px 20px 0;
+    }
+    .detail-ai-btn {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+      background: linear-gradient(135deg, #2e7d32, #1b5e20); color: #fff;
+      border: none; border-radius: 14px; padding: 14px;
+      font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit;
+      box-shadow: 0 3px 12px rgba(46,125,50,0.28);
+      transition: transform 0.15s, box-shadow 0.15s;
+      &:hover { transform: translateY(-1px); box-shadow: 0 5px 16px rgba(46,125,50,0.35); }
+    }
+    .detail-edit-btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      background: #f5f5f5; color: #555; border: 1.5px solid #e0e0e0;
+      border-radius: 14px; padding: 14px 20px;
+      font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+      transition: background 0.15s;
+      &:hover { background: #eee; }
+    }
+
+    /* ── Skeleton loading ── */
+    .skeleton-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px;
+    }
+    .sk-block {
+      border-radius: 6px; background: linear-gradient(90deg, #f0f0f0 25%, #e0e8e0 50%, #f0f0f0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      flex-shrink: 0;
+    }
+    .sk-name  { height: 14px; width: 38%; }
+    .sk-tag   { height: 14px; width: 16%; }
+    .sk-short { height: 14px; width: 12%; }
+    .sk-badge { height: 20px; width: 14%; border-radius: 20px; margin-left: auto; }
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
   `],
 })
 export class PantryComponent implements OnInit, OnDestroy {
@@ -571,6 +929,7 @@ export class PantryComponent implements OnInit, OnDestroy {
   private pantryService = inject(PantryService);
   private snackBar      = inject(MatSnackBar);
   private fb            = inject(FormBuilder);
+  private router        = inject(Router);
   private destroy$      = new Subject<void>();
   private search$       = new Subject<string>();
 
@@ -638,6 +997,16 @@ export class PantryComponent implements OnInit, OnDestroy {
       return d >= 0 && d <= 7;
     });
   });
+
+  criticalItems = computed(() =>
+    this.items().filter(i => {
+      if (!i.expiry_date) return false;
+      const d = daysLeft(i.expiry_date);
+      return d >= 0 && d <= 2;
+    }).sort((a, b) => daysLeft(a.expiry_date!) - daysLeft(b.expiry_date!))
+  );
+
+  alertDismissed = signal(false);
 
   lowStock = computed(() =>
     this.items().filter(i => {
@@ -803,6 +1172,32 @@ export class PantryComponent implements OnInit, OnDestroy {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
+
+  daysLeft(expiry: string | null): number { return daysLeft(expiry); }
+  dismissAlert() { this.alertDismissed.set(true); }
+  goToChat(items: PantryItem[]) {
+    const names = items.slice(0, 3).map(i => i.ingredient_name).join(', ');
+    this.router.navigate(['/chat'], { queryParams: { q: `I need to use up ${names} before they expire. Give me a quick recipe.` } });
+  }
+
+  // ── Onboarding ────────────────────────────────────────────────────────────
+  showOnboarding = signal(false);
+  onboardStep    = signal(0);
+  closeOnboarding() { this.showOnboarding.set(false); this.onboardStep.set(0); }
+
+  // ── Detail panel ──────────────────────────────────────────────────────────
+  selectedItem = signal<PantryItem | null>(null);
+  openDetail(item: PantryItem) { this.selectedItem.set(item); }
+  closeDetail() { this.selectedItem.set(null); }
+  askAIAbout(item: PantryItem) {
+    this.closeDetail();
+    this.router.navigate(['/chat'], { queryParams: { q: `I have ${item.ingredient_name}${item.expiry_date ? ' expiring on ' + item.expiry_date : ''}. Give me the best recipe idea and how to store it properly.` } });
+  }
+  daysBarPct(item: PantryItem): number {
+    const d = daysLeft(item.expiry_date);
+    if (d < 0) return 0;
+    return Math.min(100, Math.round((d / 30) * 100));
+  }
 
   itemStatus(item: PantryItem): 'fresh' | 'expiring' | 'expired' { return statusOf(item); }
 

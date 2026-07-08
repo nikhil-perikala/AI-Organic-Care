@@ -6,6 +6,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
 
@@ -117,7 +118,21 @@ const STATIC_SUGGESTIONS = [
   <!-- ── Messages ── -->
   <div class="chat-messages" #messagesEl>
 
-    @if (messages().length === 0) {
+    @if (isLoadingHistory() && messages().length === 0) {
+      <div class="sk-chat-wrap">
+        @for (s of [1,2,3]; track s) {
+          <div class="sk-chat-row" [class.sk-user-row]="s % 2 === 0">
+            @if (s % 2 !== 0) { <div class="sk-avatar"></div> }
+            <div class="sk-bubble-col" [class.sk-user-col]="s % 2 === 0">
+              <div class="sk-bubble" [style.width]="s === 1 ? '72%' : s === 2 ? '52%' : '64%'"></div>
+              @if (s === 1) { <div class="sk-bubble" style="width:48%;margin-top:6px"></div> }
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+    @if (!isLoadingHistory() && messages().length === 0) {
       <div class="welcome-state">
 
         <!-- Expiry alert (shown first if items expiring) -->
@@ -516,7 +531,29 @@ const STATIC_SUGGESTIONS = [
       &:disabled { background: #c8c8c8; cursor: not-allowed; box-shadow: none; }
     }
 
+    /* ── Skeleton history ────────────────────────────── */
+    .sk-chat-wrap { display: flex; flex-direction: column; gap: 16px; padding: 8px 0; }
+    .sk-chat-row  { display: flex; align-items: flex-start; gap: 8px; }
+    .sk-user-row  { flex-direction: row-reverse; }
+    .sk-avatar {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: linear-gradient(90deg,#e8f0e8 25%,#d4e4d4 50%,#e8f0e8 75%);
+      background-size: 200% 100%; animation: shimmer 1.4s infinite; flex-shrink: 0;
+    }
+    .sk-bubble-col { display: flex; flex-direction: column; max-width: 78%; }
+    .sk-user-col   { align-items: flex-end; }
+    .sk-bubble {
+      height: 44px; border-radius: 20px;
+      background: linear-gradient(90deg,#f0f0f0 25%,#e4e4e4 50%,#f0f0f0 75%);
+      background-size: 200% 100%; animation: shimmer 1.4s infinite;
+    }
+    .sk-user-row .sk-bubble {
+      background: linear-gradient(90deg,#c8dfc8 25%,#b8d0b8 50%,#c8dfc8 75%);
+      background-size: 200% 100%;
+    }
+
     /* ── Keyframes ───────────────────────────────────── */
+    @keyframes shimmer   { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
     @keyframes pulse     { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
     @keyframes pulse-red { 0%,100% { box-shadow: 0 0 0 0 rgba(229,57,53,0.4); } 50% { box-shadow: 0 0 0 6px rgba(229,57,53,0); } }
     @keyframes bounce    { 0%,80%,100% { transform: scale(0.65); opacity: 0.45; } 40% { transform: scale(1); opacity: 1; } }
@@ -537,6 +574,7 @@ export class ChatComponent implements AfterViewChecked, OnInit {
   auth      = inject(AuthService);
   private zone      = inject(NgZone);
   private sanitizer = inject(DomSanitizer);
+  private route     = inject(ActivatedRoute);
   private readonly apiUrl = environment.apiUrl;
 
   readonly moods = MOODS;
@@ -544,6 +582,7 @@ export class ChatComponent implements AfterViewChecked, OnInit {
   messages       = signal<ChatMsg[]>([]);
   isStreaming    = signal(false);
   isRecording    = signal(false);
+  isLoadingHistory = signal(false);
   suggestions    = signal<string[]>(STATIC_SUGGESTIONS);
   expiringItems  = signal<ExpiringItem[]>([]);
   pantryCount    = signal(0);
@@ -582,11 +621,19 @@ export class ChatComponent implements AfterViewChecked, OnInit {
   private readonly CHAT_KEY = 'organic_care_chat_v1';
 
   ngOnInit() {
-    this.restoreFromCache();
-    this.loadSuggestions();
-    if (this.auth.isLoggedIn()) {
-      this.loadHistory();
-      this.loadPantryData();
+    const q = this.route.snapshot.queryParams['q'];
+    if (q) {
+      this.inputText = q;
+      this.loadSuggestions();
+      if (this.auth.isLoggedIn()) { this.loadPantryData(); }
+      setTimeout(() => this.send(), 150);
+    } else {
+      this.restoreFromCache();
+      this.loadSuggestions();
+      if (this.auth.isLoggedIn()) {
+        this.loadHistory();
+        this.loadPantryData();
+      }
     }
   }
 
@@ -624,6 +671,7 @@ export class ChatComponent implements AfterViewChecked, OnInit {
   private async loadHistory() {
     const token = this.auth.getAccessToken();
     if (!token) return;
+    this.isLoadingHistory.set(true);
     try {
       const res = await fetch(`${this.apiUrl}/chat/history`, {
         headers: { 'Authorization': `Bearer ${token}` },
@@ -635,7 +683,9 @@ export class ChatComponent implements AfterViewChecked, OnInit {
       }));
       this.zone.run(() => { this.messages.set(msgs); this.shouldScroll = true; });
       this.saveToCache();
-    } catch {}
+    } catch {} finally {
+      this.zone.run(() => this.isLoadingHistory.set(false));
+    }
   }
 
   private async loadSuggestions() {

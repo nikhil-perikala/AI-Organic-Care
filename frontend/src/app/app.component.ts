@@ -35,6 +35,15 @@ const NAV_CENTER: NavTab = {
   template: `
     <div class="app-shell">
 
+      <!-- Offline indicator -->
+      @if (isOffline()) {
+        <div class="offline-banner" role="alert">
+          <mat-icon style="font-size:16px;vertical-align:middle">wifi_off</mat-icon>
+          <span>No internet connection · retrying…</span>
+          <span class="offline-dot"></span>
+        </div>
+      }
+
       <aside class="sidebar d-none d-md-flex flex-column">
         <div class="sidebar-brand px-3 py-4 d-flex align-items-center gap-2 border-bottom">
           <mat-icon class="text-success">eco</mat-icon>
@@ -432,6 +441,23 @@ const NAV_CENTER: NavTab = {
     }
 
     /* ── Idle warning ──────────────────────────────── */
+    .offline-banner {
+      position: sticky; top: 0; z-index: 9998;
+      background: #1a1a1a; color: #fff;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 8px 16px; font-size: 13px; font-weight: 600;
+      animation: slideDown 0.25s ease-out;
+    }
+    @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+    .offline-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #ff5252; animation: pulse-red 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse-red {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.5; transform: scale(0.8); }
+    }
+
     .idle-backdrop {
       position: fixed;
       inset: 0;
@@ -546,6 +572,21 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly activityEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
   private readonly onActivity = () => this.resetIdleTimer();
 
+  // ── Offline indicator ────────────────────────────────────────────────────────
+  isOffline = signal(!navigator.onLine);
+  private retryTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly onOnline  = () => { this.zone.run(() => this.isOffline.set(false)); if (this.retryTimer) { clearInterval(this.retryTimer); this.retryTimer = null; } };
+  private readonly onOffline = () => { this.zone.run(() => this.isOffline.set(true)); this.startRetry(); };
+  private startRetry() {
+    if (this.retryTimer) return;
+    this.retryTimer = setInterval(() => {
+      fetch('/favicon.ico', { cache: 'no-store' }).then(() => {
+        if (this.isOffline()) this.zone.run(() => this.isOffline.set(false));
+        if (this.retryTimer) { clearInterval(this.retryTimer); this.retryTimer = null; }
+      }).catch(() => {});
+    }, 30_000);
+  }
+
   constructor() {
     this.router.events
       .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
@@ -571,13 +612,19 @@ export class AppComponent implements OnInit, OnDestroy {
       this.activityEvents.forEach(ev =>
         document.addEventListener(ev, this.onActivity, { passive: true })
       );
+      window.addEventListener('online',  this.onOnline);
+      window.addEventListener('offline', this.onOffline);
     });
+    if (!navigator.onLine) this.startRetry();
   }
 
   ngOnDestroy() {
     this.activityEvents.forEach(ev =>
       document.removeEventListener(ev, this.onActivity)
     );
+    window.removeEventListener('online',  this.onOnline);
+    window.removeEventListener('offline', this.onOffline);
+    if (this.retryTimer) { clearInterval(this.retryTimer); this.retryTimer = null; }
     this.clearIdleTimers();
   }
 
