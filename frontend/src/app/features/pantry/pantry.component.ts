@@ -295,6 +295,36 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
           </div>
         </div>
 
+        <!-- Upload Receipt card -->
+        <div class="card border-0 shadow-sm" style="border-radius:16px">
+          <div class="card-body p-3">
+            <div class="d-flex align-items-start gap-2 mb-3">
+              <span style="font-size:20px">🧾</span>
+              <div>
+                <div class="fw-bold" style="font-size:14px">Upload Receipt</div>
+                <div class="text-muted" style="font-size:11px">Scan a grocery receipt to bulk-add items</div>
+              </div>
+            </div>
+
+            <input #receiptFileInput type="file" accept="image/jpeg,image/png,image/webp,application/pdf"
+              class="d-none" (change)="onReceiptFile($event)">
+
+            <button class="btn w-100 receipt-upload-btn" (click)="receiptFileInput.click()"
+              [disabled]="receiptScanning()">
+              @if (receiptScanning()) {
+                <span class="spinner-border spinner-border-sm me-2"></span> Scanning…
+              } @else {
+                <mat-icon style="font-size:18px;vertical-align:middle;margin-right:6px">photo_camera</mat-icon>
+                Take Photo / Upload Receipt
+              }
+            </button>
+
+            <div class="text-muted text-center mt-2" style="font-size:10px">
+              Supports JPG, PNG, WebP, PDF · Max 10 MB
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -505,6 +535,64 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
 
   </div>
 </div>
+
+<!-- ════════════════════════════════════════════════════════════
+     Receipt Review Modal
+     ════════════════════════════════════════════════════════════ -->
+@if (receiptItems().length > 0) {
+  <div class="modal-overlay" (click)="closeReceipt()">
+    <div class="card border-0 shadow-lg modal-card" style="border-radius:18px;max-height:85vh;display:flex;flex-direction:column"
+      (click)="$event.stopPropagation()">
+
+      <!-- Header -->
+      <div class="d-flex align-items-center justify-content-between p-3 pb-2 border-bottom flex-shrink-0">
+        <div>
+          <div class="fw-bold" style="font-size:15px">🧾 Review Extracted Items</div>
+          <div class="text-muted" style="font-size:11px">
+            {{ selectedReceiptIds().size }} of {{ receiptItems().length }} selected
+          </div>
+        </div>
+        <button class="btn btn-sm btn-light rounded-circle p-1" (click)="closeReceipt()">
+          <mat-icon style="font-size:20px;color:#9e9e9e;line-height:1;display:block">close</mat-icon>
+        </button>
+      </div>
+
+      <!-- Item list -->
+      <div style="overflow-y:auto;flex:1;padding:8px 12px">
+        @for (item of receiptItems(); track $index; let i = $index) {
+          <div class="receipt-item-row" [class.receipt-item-selected]="selectedReceiptIds().has(i)"
+            (click)="toggleReceiptItem(i)">
+            <div class="receipt-check">
+              <mat-icon style="font-size:18px">
+                {{ selectedReceiptIds().has(i) ? 'check_circle' : 'radio_button_unchecked' }}
+              </mat-icon>
+            </div>
+            <div class="flex-fill">
+              <div class="fw-semibold" style="font-size:13px;color:#1a2a1a">{{ item.ingredient_name }}</div>
+              @if (item.quantity || item.unit) {
+                <div class="text-muted" style="font-size:11px">{{ item.quantity }} {{ item.unit }}</div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Footer -->
+      <div class="p-3 pt-2 border-top flex-shrink-0 d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm flex-fill" (click)="toggleAllReceipt()">
+          {{ selectedReceiptIds().size === receiptItems().length ? 'Deselect All' : 'Select All' }}
+        </button>
+        <button class="btn btn-success btn-sm flex-fill fw-bold" (click)="saveReceiptItems()"
+          [disabled]="selectedReceiptIds().size === 0 || receiptSaving()">
+          @if (receiptSaving()) {
+            <span class="spinner-border spinner-border-sm me-1"></span>
+          }
+          Add {{ selectedReceiptIds().size }} Item{{ selectedReceiptIds().size !== 1 ? 's' : '' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
 
 <!-- ════════════════════════════════════════════════════════════
      Onboarding Modal
@@ -798,6 +886,25 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
     .status-expired  { background: #ffebee; color: #c62828; }
     .status-none     { background: #f5f5f5; color: #9e9e9e; }
 
+    /* ── Receipt upload ── */
+    .receipt-upload-btn {
+      background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
+      border: 1.5px dashed #81c784; color: #2e7d32;
+      border-radius: 12px; padding: 12px; font-size: 13px; font-weight: 700;
+      transition: all 0.15s;
+      &:hover:not(:disabled) { background: #e0f2e0; border-color: #4caf50; }
+      &:disabled { opacity: 0.6; cursor: not-allowed; }
+    }
+    .receipt-item-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 8px; border-radius: 10px; cursor: pointer;
+      transition: background 0.12s; margin-bottom: 4px;
+      &:hover { background: #f4f9f4; }
+    }
+    .receipt-item-selected { background: #e8f5e9 !important; }
+    .receipt-check mat-icon { color: #9e9e9e; transition: color 0.12s; }
+    .receipt-item-selected .receipt-check mat-icon { color: #2e7d32; }
+
     /* ── Onboarding Modal ── */
     .onboard-steps {
       display: flex; justify-content: center; gap: 8px; padding: 20px 0 0;
@@ -1015,6 +1122,76 @@ export class PantryComponent implements OnInit, OnDestroy {
       return !isNaN(n) && n <= 1;
     })
   );
+
+  // ── Receipt upload ─────────────────────────────────────────────────────────
+  receiptScanning     = signal(false);
+  receiptSaving       = signal(false);
+  receiptItems        = signal<Array<{ ingredient_name: string; quantity: string | null; unit: string | null; expiry_date: string | null }>>([]);
+  selectedReceiptIds  = signal<Set<number>>(new Set());
+
+  onReceiptFile(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    (event.target as HTMLInputElement).value = '';
+    this.receiptScanning.set(true);
+    this.pantryService.uploadReceipt(file).subscribe({
+      next: ({ items }) => {
+        this.receiptScanning.set(false);
+        this.receiptItems.set(items);
+        this.selectedReceiptIds.set(new Set(items.map((_, i) => i)));
+      },
+      error: () => {
+        this.receiptScanning.set(false);
+        this.snackBar.open('Could not read receipt. Try a clearer photo.', 'OK', { duration: 4000 });
+      },
+    });
+  }
+
+  toggleReceiptItem(i: number) {
+    const s = new Set(this.selectedReceiptIds());
+    s.has(i) ? s.delete(i) : s.add(i);
+    this.selectedReceiptIds.set(s);
+  }
+
+  toggleAllReceipt() {
+    const all = this.receiptItems().map((_, i) => i);
+    this.selectedReceiptIds.set(
+      this.selectedReceiptIds().size === all.length ? new Set() : new Set(all)
+    );
+  }
+
+  closeReceipt() {
+    this.receiptItems.set([]);
+    this.selectedReceiptIds.set(new Set());
+  }
+
+  saveReceiptItems() {
+    const ids = this.selectedReceiptIds();
+    const toAdd = this.receiptItems()
+      .filter((_, i) => ids.has(i))
+      .map(item => ({
+        ingredient_name: item.ingredient_name,
+        quantity: item.quantity,
+        unit: item.unit,
+        category: inferCategory(item.ingredient_name) || null,
+        expiry_date: item.expiry_date,
+        storage_tips: null,
+      }));
+    if (!toAdd.length) return;
+    this.receiptSaving.set(true);
+    this.pantryService.addBulk(toAdd).subscribe({
+      next: added => {
+        this.items.update(prev => [...prev, ...added]);
+        this.receiptSaving.set(false);
+        this.closeReceipt();
+        this.snackBar.open(`✓ ${added.length} item${added.length !== 1 ? 's' : ''} added to pantry`, 'OK', { duration: 3000 });
+      },
+      error: () => {
+        this.receiptSaving.set(false);
+        this.snackBar.open('Failed to save items. Please try again.', 'OK', { duration: 3000 });
+      },
+    });
+  }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
