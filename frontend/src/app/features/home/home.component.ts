@@ -149,71 +149,55 @@ function getGreeting(): string {
   template: `
 <div class="home-page">
 
-  <!-- ── S1: Greeting banner ─────────────────────────────── -->
-  <div class="greeting-banner px-4 py-4">
-    <div class="d-flex align-items-center justify-content-between">
-      <div>
-        <p class="mb-1 text-uppercase fw-semibold" style="font-size:10px;letter-spacing:1.5px;color:rgba(255,255,255,0.55)">{{ greeting }}</p>
-        <h1 class="fw-bold text-white mb-0" style="font-size:clamp(20px,5vw,28px);line-height:1.15;letter-spacing:-0.3px">
-          {{ userName }}
-        </h1>
-        <p class="mb-0 mt-1" style="color:rgba(255,255,255,0.6);font-size:13px">Your AI-powered organic wellness companion</p>
+  <!-- ── Welcome Hero ─────────────────────────────────────── -->
+  <div class="welcome-hero">
+    <div class="welcome-deco-1"></div>
+    <div class="welcome-deco-2"></div>
+
+    <div class="welcome-badge-row">
+      <span class="welcome-badge">🌿 Organic Care AI</span>
+    </div>
+
+    <h1 class="welcome-title">{{ greeting }},<br>{{ userName }}!</h1>
+    <p class="welcome-sub">Your personalised AI wellness companion</p>
+
+    @if (auth.isLoggedIn()) {
+      <div class="welcome-stats" (click)="goToPantry()">
+        <div class="welcome-stat">
+          <div class="welcome-stat-num">{{ pantryCount() }}</div>
+          <div class="welcome-stat-lbl">Pantry Items</div>
+        </div>
+        <div class="welcome-stat-sep"></div>
+        <div class="welcome-stat">
+          <div class="welcome-stat-num" [class.welcome-stat-warn]="expiringCount() > 0">{{ expiringCount() }}</div>
+          <div class="welcome-stat-lbl">Expiring Soon</div>
+        </div>
+        <div class="welcome-stat-sep"></div>
+        <div class="welcome-stat">
+          <div class="welcome-stat-num">AI</div>
+          <div class="welcome-stat-lbl">Ready ✓</div>
+        </div>
       </div>
-      <div class="greeting-avatar">
-        <mat-icon style="font-size:26px;color:#fff">eco</mat-icon>
-      </div>
+    }
+
+    <div class="welcome-actions">
+      <button class="welcome-btn-primary" (click)="goToChat()">
+        <mat-icon>smart_toy</mat-icon> Ask AI
+      </button>
+      <button class="welcome-btn-ghost" (click)="goMode('meals')">
+        <mat-icon>restaurant_menu</mat-icon> Recipes
+      </button>
+      @if (auth.isLoggedIn()) {
+        <button class="welcome-btn-ghost" (click)="goToPantry()">
+          <mat-icon>kitchen</mat-icon> Pantry
+        </button>
+      } @else {
+        <button class="welcome-btn-ghost" (click)="goMode('chat')">
+          <mat-icon>login</mat-icon> Sign In
+        </button>
+      }
     </div>
   </div>
-
-  <!-- ── S1b: Dashboard summary (logged-in only) ─────────── -->
-  @if (auth.isLoggedIn()) {
-    <div class="px-3 px-md-4 mt-3">
-      <div class="row g-2">
-
-        <!-- Pantry Items -->
-        <div class="col-4">
-          <div class="ps-stat-card bg-white shadow-sm" style="cursor:pointer" (click)="goToPantry()">
-            <div class="ps-stat-icon" style="background:#e8f5e9">
-              <mat-icon style="font-size:16px;color:#2e7d32;width:16px;height:16px;line-height:1">inventory_2</mat-icon>
-            </div>
-            <div class="fw-bold" style="font-size:20px;color:#1a2a1a;line-height:1">{{ pantryCount() }}</div>
-            <div class="text-muted" style="font-size:11px">Pantry Items</div>
-            <span class="ps-pill" style="background:#e8f5e9;color:#2e7d32">View All →</span>
-          </div>
-        </div>
-
-        <!-- Expiring Soon -->
-        <div class="col-4">
-          <div class="ps-stat-card bg-white shadow-sm" style="cursor:pointer" (click)="goToPantry()">
-            <div class="ps-stat-icon" style="background:#fff3e0">
-              <mat-icon style="font-size:16px;color:#f57c00;width:16px;height:16px;line-height:1">schedule</mat-icon>
-            </div>
-            <div class="fw-bold" style="font-size:20px;line-height:1"
-              [style.color]="expiringCount() > 0 ? '#e65100' : '#1a2a1a'">{{ expiringCount() }}</div>
-            <div class="text-muted" style="font-size:11px">Expiring Soon</div>
-            @if (expiringCount() > 0) {
-              <span class="ps-pill" style="background:#fff3e0;color:#e65100">⚠ Use Soon</span>
-            } @else {
-              <span class="ps-pill" style="background:#e8f5e9;color:#2e7d32">✓ All Good</span>
-            }
-          </div>
-        </div>
-
-        <!-- Cook Now CTA -->
-        <div class="col-4">
-          <div class="ps-stat-card shadow-sm" style="background:linear-gradient(135deg,#2e7d32,#43a047);cursor:pointer;border:none"
-            (click)="goToChat()">
-            <div class="ps-stat-icon" style="background:rgba(255,255,255,0.2)">
-              <mat-icon style="font-size:16px;color:#fff;width:16px;height:16px;line-height:1">smart_toy</mat-icon>
-            </div>
-            <div class="fw-bold text-white" style="font-size:13px;line-height:1.2">Cook<br>Now</div>
-            <span class="ps-pill" style="background:rgba(255,255,255,0.2);color:#fff">Ask AI →</span>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  }
 
   <!-- ── S1b: Hero carousel ───────────────────────────────── -->
   <div class="hero-card mx-3 mx-md-4 mt-3">
@@ -624,21 +608,85 @@ function getGreeting(): string {
   `,
   styles: [`
     .home-page { padding-bottom: 88px; }
-
     .section-title { font-size: 16px; font-weight: 700; color: #1a2a1a; }
 
-    /* ── Greeting ── */
-    .greeting-banner {
-      background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 55%, #388e3c 100%);
+    /* ── Welcome Hero ── */
+    .welcome-hero {
+      position: relative; overflow: hidden;
+      background: linear-gradient(150deg, #145a1f 0%, #2e7d32 40%, #388e3c 70%, #4caf50 100%);
+      padding: 36px 20px 44px;
+      animation: wFadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both;
     }
-    .greeting-avatar {
-      width: 52px; height: 52px; border-radius: 50%;
+    @keyframes wFadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .welcome-deco-1 {
+      position: absolute; top: -90px; right: -70px;
+      width: 280px; height: 280px; border-radius: 50%;
+      background: rgba(255,255,255,0.07); pointer-events: none;
+    }
+    .welcome-deco-2 {
+      position: absolute; bottom: -60px; left: 15%;
+      width: 200px; height: 200px; border-radius: 50%;
+      background: rgba(255,255,255,0.04); pointer-events: none;
+    }
+    .welcome-badge-row { margin-bottom: 18px; }
+    .welcome-badge {
+      display: inline-flex; align-items: center; gap: 6px;
       background: rgba(255,255,255,0.15);
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
+      border: 1px solid rgba(255,255,255,0.22);
+      border-radius: 100px; padding: 5px 14px;
+      font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.9);
+    }
+    .welcome-title {
+      font-size: clamp(28px,8vw,44px); font-weight: 800;
+      color: #fff; line-height: 1.1; letter-spacing: -0.5px; margin: 0 0 8px;
+    }
+    .welcome-sub {
+      color: rgba(255,255,255,0.62); font-size: 14px; margin: 0 0 24px;
+    }
+    .welcome-stats {
+      display: flex; align-items: center;
+      background: rgba(0,0,0,0.2); border-radius: 14px;
+      padding: 14px 20px; margin-bottom: 22px;
+      max-width: 360px; cursor: pointer;
+    }
+    .welcome-stat { flex: 1; text-align: center; }
+    .welcome-stat-num {
+      font-size: 26px; font-weight: 800; color: #fff; line-height: 1;
+    }
+    .welcome-stat-num.welcome-stat-warn { color: #ffcc80; }
+    .welcome-stat-lbl {
+      font-size: 10px; color: rgba(255,255,255,0.52);
+      text-transform: uppercase; letter-spacing: 0.8px; margin-top: 3px;
+    }
+    .welcome-stat-sep {
+      width: 1px; height: 38px; background: rgba(255,255,255,0.14); margin: 0 8px;
+    }
+    .welcome-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .welcome-btn-primary, .welcome-btn-ghost {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 11px 20px; border-radius: 100px;
+      font-size: 13px; font-weight: 600; border: none; cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .welcome-btn-primary:active, .welcome-btn-ghost:active { transform: scale(0.96); }
+    .welcome-btn-primary {
+      background: #fff; color: #1b5e20;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.22);
+    }
+    .welcome-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.28); }
+    .welcome-btn-ghost {
+      background: rgba(255,255,255,0.14); color: #fff;
+      border: 1.5px solid rgba(255,255,255,0.25);
+    }
+    .welcome-btn-ghost:hover { background: rgba(255,255,255,0.22); }
+    .welcome-btn-primary mat-icon, .welcome-btn-ghost mat-icon {
+      font-size: 17px; width: 17px; height: 17px;
     }
     @media (min-width: 768px) {
-      .greeting-banner { border-radius: 0 0 24px 24px; }
+      .welcome-hero { border-radius: 0 0 28px 28px; padding: 52px 44px 60px; }
       .home-page { padding-bottom: 40px; max-width: 1100px; margin: 0 auto; }
     }
 
