@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, NgZone } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -148,6 +148,11 @@ function getGreeting(): string {
   imports: [CommonModule, RouterLink, MatIconModule],
   template: `
 <div class="home-page">
+
+  <!-- ── AI Awakening intro overlay ───────────────────────── -->
+  @if (!awakeningDone()) {
+    <canvas class="awakening-canvas" #awakeningCanvas></canvas>
+  }
 
   <!-- ── S1: Greeting banner ─────────────────────────────── -->
   <div class="greeting-banner px-4 py-3">
@@ -622,7 +627,18 @@ function getGreeting(): string {
 </div>
   `,
   styles: [`
-    .home-page { padding-bottom: 88px; }
+    /* ── AI Awakening canvas ── */
+    .awakening-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 9999;
+      pointer-events: none;
+      display: block;
+    }
+
+    .home-page { padding-bottom: 88px; position: relative; }
 
     .section-title { font-size: 16px; font-weight: 700; color: #1a2a1a; }
 
@@ -872,11 +888,16 @@ function getGreeting(): string {
     }
   `],
 })
-export class HomeComponent implements OnInit, OnDestroy {
+export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   router  = inject(Router);
   auth    = inject(AuthService);
   favSvc  = inject(FavoritesService);
   private http = inject(HttpClient);
+  private zone = inject(NgZone);
+
+  @ViewChild('awakeningCanvas') private awakeningCanvasRef?: ElementRef<HTMLCanvasElement>;
+  awakeningDone = signal(!!localStorage.getItem('organic_care_awakened'));
+  private awFrame = 0;
 
   greeting    = getGreeting();
   imgFallback = IMG_FALLBACK;
@@ -921,8 +942,15 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
+  ngAfterViewInit() {
+    if (!this.awakeningDone() && this.awakeningCanvasRef) {
+      this.zone.runOutsideAngular(() => this.runAwakening());
+    }
+  }
+
   ngOnDestroy() {
     clearInterval(this.heroInterval);
+    cancelAnimationFrame(this.awFrame);
   }
 
   private startHeroSlider() {
@@ -997,6 +1025,136 @@ export class HomeComponent implements OnInit, OnDestroy {
   parseSteps(instructions: string | null): string[] {
     if (!instructions) return [];
     return instructions.split(/\n+|\d+\.\s+/).map(s => s.trim()).filter(Boolean);
+  }
+
+  private runAwakening() {
+    const canvas = this.awakeningCanvasRef!.nativeElement;
+    const ctx = canvas.getContext('2d')!;
+
+    const resize = () => {
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resize();
+
+    const W = canvas.width, H = canvas.height;
+    const CX = W / 2, CY = H / 2;
+    const TOTAL = 2500;          // ms for full animation
+    const HOLD  = 600;           // ms logo holds after converge
+    const FADE  = 400;           // ms fade-out
+
+    // Build particle cloud
+    interface Particle {
+      x: number; y: number;
+      tx: number; ty: number;   // target (near centre)
+      vx: number; vy: number;
+      r: number;
+      color: string;
+      phase: number;
+    }
+
+    const colors = ['#4caf50','#81c784','#a5d6a7','#ffffff','#c8e6c9','#66bb6a'];
+    const N = Math.min(Math.floor(W * H / 400), 1800);
+    const particles: Particle[] = Array.from({ length: N }, () => {
+      const angle = Math.random() * Math.PI * 2;
+      const dist  = Math.random() * Math.max(W, H) * 0.6 + Math.max(W, H) * 0.1;
+      return {
+        x: CX + Math.cos(angle) * dist,
+        y: CY + Math.sin(angle) * dist,
+        tx: CX + (Math.random() - 0.5) * 180,
+        ty: CY + (Math.random() - 0.5) * 50,
+        vx: 0, vy: 0,
+        r: Math.random() * 1.8 + 0.4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        phase: Math.random() * Math.PI * 2,
+      };
+    });
+
+    const start = performance.now();
+    let exploding = false;
+
+    const loop = (now: number) => {
+      const elapsed = now - start;
+      const convergeT = Math.min(elapsed / (TOTAL - HOLD - FADE), 1);
+      const ease = 1 - Math.pow(1 - convergeT, 3); // cubic ease-in-out
+
+      ctx.clearRect(0, 0, W, H);
+
+      // Background: dark green fading as particles converge
+      const bgAlpha = 0.92 - ease * 0.55;
+      ctx.fillStyle = `rgba(5, 18, 5, ${bgAlpha})`;
+      ctx.fillRect(0, 0, W, H);
+
+      // Draw particles
+      for (const p of particles) {
+        if (exploding) {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vx *= 0.97;
+          p.vy *= 0.97;
+        } else {
+          p.x += (p.tx - p.x) * ease * 0.12;
+          p.y += (p.ty - p.y) * ease * 0.12;
+        }
+        const glow = 0.5 + 0.5 * Math.sin(now * 0.003 + p.phase);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * (1 + glow * 0.6), 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = 0.5 + glow * 0.5;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      // Logo text glow when mostly converged
+      if (convergeT > 0.65) {
+        const textAlpha = Math.min((convergeT - 0.65) / 0.35, 1);
+        const glowPulse = 0.5 + 0.5 * Math.sin(now * 0.004);
+
+        ctx.save();
+        ctx.globalAlpha = textAlpha * (exploding ? Math.max(0, 1 - (elapsed - (TOTAL - FADE)) / FADE) : 1);
+
+        // Outer glow
+        ctx.shadowColor = '#4caf50';
+        ctx.shadowBlur  = 30 + glowPulse * 20;
+
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'middle';
+
+        ctx.font = `bold ${Math.min(W * 0.06, 42)}px "Segoe UI", sans-serif`;
+        ctx.fillStyle = '#c8e6c9';
+        ctx.fillText('🌿 Organic Care', CX, CY - 18);
+
+        ctx.shadowBlur = 0;
+        ctx.font = `${Math.min(W * 0.028, 18)}px "Segoe UI", sans-serif`;
+        ctx.fillStyle = 'rgba(200,230,200,0.7)';
+        ctx.fillText('Your AI Wellness Companion', CX, CY + 22);
+
+        ctx.restore();
+      }
+
+      // Trigger explosion + fade
+      if (!exploding && elapsed >= TOTAL - HOLD - FADE) {
+        exploding = true;
+        for (const p of particles) {
+          const ang = Math.atan2(p.y - CY, p.x - CX);
+          const spd = Math.random() * 8 + 3;
+          p.vx = Math.cos(ang) * spd;
+          p.vy = Math.sin(ang) * spd;
+        }
+      }
+
+      if (elapsed < TOTAL) {
+        this.awFrame = requestAnimationFrame(loop);
+      } else {
+        // Fully done — mark complete and remove overlay
+        this.zone.run(() => {
+          localStorage.setItem('organic_care_awakened', '1');
+          this.awakeningDone.set(true);
+        });
+      }
+    };
+
+    this.awFrame = requestAnimationFrame(loop);
   }
 
   goToPantry()       { this.router.navigate(['/pantry']); }
