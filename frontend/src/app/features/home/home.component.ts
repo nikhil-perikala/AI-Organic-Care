@@ -417,8 +417,6 @@ function getGreeting(): string {
               View Pantry
             </button>
           </div>
-          <img src="https://images.unsplash.com/photo-1584568694244-14fbdf83bd30?w=300&auto=format&fit=crop&q=80"
-               class="bottom-card-img" alt="Pantry">
         </div>
       </div>
 
