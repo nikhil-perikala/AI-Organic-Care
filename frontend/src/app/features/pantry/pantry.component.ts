@@ -311,12 +311,8 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
 
             <button class="btn w-100 receipt-upload-btn" (click)="receiptFileInput.click()"
               [disabled]="receiptScanning()">
-              @if (receiptScanning()) {
-                <span class="spinner-border spinner-border-sm me-2"></span> Scanning…
-              } @else {
-                <mat-icon style="font-size:18px;vertical-align:middle;margin-right:6px">photo_camera</mat-icon>
-                Take Photo / Upload Receipt
-              }
+              <mat-icon style="font-size:18px;vertical-align:middle;margin-right:6px">photo_camera</mat-icon>
+              Take Photo / Upload Receipt
             </button>
 
             <div class="text-muted text-center mt-2" style="font-size:10px">
@@ -535,6 +531,35 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
 
   </div>
 </div>
+
+<!-- ════════════════════════════════════════════════════════════
+     Receipt Scanner Portal
+     ════════════════════════════════════════════════════════════ -->
+@if (receiptScanning()) {
+  <div class="portal-overlay">
+    <div class="portal-wrap">
+
+      <!-- rotating rings -->
+      <div class="portal-ring portal-ring-1"></div>
+      <div class="portal-ring portal-ring-2"></div>
+      <div class="portal-ring portal-ring-3"></div>
+
+      <!-- inner glow -->
+      <div class="portal-core">
+        <div class="portal-icon">🧾</div>
+        <div class="portal-scan-bar"></div>
+      </div>
+
+      <!-- label -->
+      <div class="portal-label">
+        <span class="portal-dot"></span>
+        <span class="portal-dot"></span>
+        <span class="portal-dot"></span>
+        Analysing receipt…
+      </div>
+    </div>
+  </div>
+}
 
 <!-- ════════════════════════════════════════════════════════════
      Receipt Review Modal
@@ -904,6 +929,72 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
     .receipt-item-selected { background: #e8f5e9 !important; }
     .receipt-check mat-icon { color: #9e9e9e; transition: color 0.12s; }
     .receipt-item-selected .receipt-check mat-icon { color: #2e7d32; }
+
+    /* ── Receipt Scanner Portal ── */
+    .portal-overlay {
+      position: fixed; inset: 0; z-index: 2000;
+      background: rgba(0,0,0,0.82);
+      display: flex; align-items: center; justify-content: center;
+      animation: fadeIn 0.3s ease;
+    }
+    .portal-wrap {
+      position: relative; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 28px;
+    }
+    .portal-ring {
+      position: absolute; border-radius: 50%;
+      border: 2px solid transparent;
+    }
+    .portal-ring-1 {
+      width: 220px; height: 220px;
+      border-top-color: #4caf50; border-right-color: #4caf50;
+      animation: spin 1.4s linear infinite;
+      box-shadow: 0 0 20px rgba(76,175,80,0.4);
+    }
+    .portal-ring-2 {
+      width: 180px; height: 180px;
+      border-bottom-color: #81c784; border-left-color: #81c784;
+      animation: spin 1.0s linear infinite reverse;
+      box-shadow: 0 0 14px rgba(129,199,132,0.3);
+    }
+    .portal-ring-3 {
+      width: 140px; height: 140px;
+      border-top-color: rgba(165,214,167,0.7); border-right-color: rgba(165,214,167,0.7);
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .portal-core {
+      width: 100px; height: 100px; border-radius: 50%;
+      background: radial-gradient(circle at 40% 38%, #a5d6a7, #2e7d32, #0a2e0a);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 40px rgba(76,175,80,0.5), 0 0 80px rgba(76,175,80,0.2);
+      position: relative; overflow: hidden;
+    }
+    .portal-icon { font-size: 36px; z-index: 1; }
+    .portal-scan-bar {
+      position: absolute; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, transparent, #a5ffa8, transparent);
+      animation: scanBar 1.2s ease-in-out infinite;
+      box-shadow: 0 0 12px #4caf50;
+    }
+    @keyframes scanBar {
+      0%   { top: 10%; opacity: 0; }
+      10%  { opacity: 1; }
+      90%  { opacity: 1; }
+      100% { top: 90%; opacity: 0; }
+    }
+    .portal-label {
+      color: #a5d6a7; font-size: 14px; font-weight: 700;
+      letter-spacing: 1px; display: flex; align-items: center; gap: 6px;
+      margin-top: 130px;
+    }
+    .portal-dot {
+      width: 6px; height: 6px; border-radius: 50%; background: #4caf50;
+      animation: portalPulse 1.2s ease-in-out infinite;
+      &:nth-child(2) { animation-delay: 0.2s; }
+      &:nth-child(3) { animation-delay: 0.4s; }
+    }
+    @keyframes portalPulse { 0%,100% { opacity: 0.3; transform: scale(0.7); } 50% { opacity: 1; transform: scale(1); } }
 
     /* ── Onboarding Modal ── */
     .onboard-steps {
