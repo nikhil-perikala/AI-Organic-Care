@@ -97,7 +97,7 @@ const STATIC_SUGGESTIONS = [
   <div class="chat-header">
     <div class="chat-header-left">
       <div class="chat-avatar">
-        <span style="font-size:20px">🌿</span>
+        <canvas class="orb-canvas" #orbCanvas width="40" height="40"></canvas>
       </div>
       <div>
         <div class="chat-name">Organic Care AI</div>
@@ -214,7 +214,7 @@ const STATIC_SUGGESTIONS = [
     @for (msg of messages(); track msg.id) {
       <div class="msg-row" [class.user-row]="msg.role === 'user'">
         @if (msg.role === 'assistant') {
-          <div class="msg-avatar-sm">🌿</div>
+          <div class="msg-avatar-sm"><div class="orb-mini"></div></div>
         }
         <div class="msg-col">
           <div class="bubble"
@@ -311,6 +311,7 @@ const STATIC_SUGGESTIONS = [
       width: 40px; height: 40px; border-radius: 50%;
       background: rgba(255,255,255,0.18); border: 1.5px solid rgba(255,255,255,0.25);
       display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
     }
     .chat-name   { font-size: 15px; font-weight: 700; color: #fff; letter-spacing: 0.1px; }
     .chat-status {
@@ -438,11 +439,21 @@ const STATIC_SUGGESTIONS = [
 
     .msg-avatar-sm {
       width: 30px; height: 30px; border-radius: 50%;
-      background: #e8f5e9; border: 1.5px solid #c8e6c9;
+      border: 1.5px solid #c8e6c9;
       flex-shrink: 0; margin-top: 2px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 14px; line-height: 1;
+      overflow: hidden; background: #1b5e20;
     }
+    .orb-mini {
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+      background: radial-gradient(circle at 38% 32%, #b2dfb2 0%, #388e3c 45%, #1b5e20 100%);
+      animation: orbBreath 3s ease-in-out infinite;
+    }
+    @keyframes orbBreath {
+      0%,100% { box-shadow: 0 0 6px rgba(76,175,80,0.3) inset; }
+      50%      { box-shadow: 0 0 14px rgba(120,230,130,0.55) inset; }
+    }
+    .orb-canvas { display: block; border-radius: 50%; }
 
     /* Bubbles */
     .bubble {
@@ -582,6 +593,7 @@ const STATIC_SUGGESTIONS = [
 export class ChatComponent implements AfterViewChecked, AfterViewInit, OnInit, OnDestroy {
   @ViewChild('messagesEl')   private messagesEl?:    ElementRef<HTMLDivElement>;
   @ViewChild('neuralCanvas') private neuralCanvas!:  ElementRef<HTMLCanvasElement>;
+  @ViewChild('orbCanvas')    private orbCanvas!:     ElementRef<HTMLCanvasElement>;
 
   auth              = inject(AuthService);
   private zone      = inject(NgZone);
@@ -596,11 +608,21 @@ export class ChatComponent implements AfterViewChecked, AfterViewInit, OnInit, O
   private nnPulses:  Array<{from:number;to:number;t:number;speed:number}> = [];
   private nnResize!: () => void;
 
+  // ── Orb state ─────────────────────────────────────────────────────────────
+  private orbCtx!:     CanvasRenderingContext2D;
+  private orbFrame =   0;
+  private orbPhase =   0;
+  private orbRipples:  Array<{r:number;alpha:number;speed:number}> = [];
+
   constructor() {
-    // trigger AI wave whenever streaming starts
     effect(() => {
       if (this.isStreaming()) {
         this.zone.runOutsideAngular(() => this.nnWave());
+      }
+    });
+    effect(() => {
+      if (this.isRecording()) {
+        this.zone.runOutsideAngular(() => this.orbRipple());
       }
     });
   }
@@ -667,24 +689,31 @@ export class ChatComponent implements AfterViewChecked, AfterViewInit, OnInit, O
 
   ngAfterViewInit() {
     this.zone.runOutsideAngular(() => {
-      const canvas = this.neuralCanvas?.nativeElement;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      this.nnCtx = ctx;
-      this.nnResize = () => {
-        canvas.width  = canvas.clientWidth;
-        canvas.height = canvas.clientHeight;
-        this.nnBuildNodes();
-      };
-      this.nnResize();
-      window.addEventListener('resize', this.nnResize);
-      this.nnLoop();
+      // neural network
+      const nnCanvas = this.neuralCanvas?.nativeElement;
+      if (nnCanvas) {
+        const ctx = nnCanvas.getContext('2d');
+        if (ctx) {
+          this.nnCtx = ctx;
+          this.nnResize = () => {
+            nnCanvas.width  = nnCanvas.clientWidth;
+            nnCanvas.height = nnCanvas.clientHeight;
+            this.nnBuildNodes();
+          };
+          this.nnResize();
+          window.addEventListener('resize', this.nnResize);
+          this.nnLoop();
+        }
+      }
+      // AI orb
+      const orbEl = this.orbCanvas?.nativeElement;
+      if (orbEl) { this.orbInit(orbEl); }
     });
   }
 
   ngOnDestroy() {
     cancelAnimationFrame(this.nnFrame);
+    cancelAnimationFrame(this.orbFrame);
     window.removeEventListener('resize', this.nnResize);
   }
 
@@ -959,6 +988,92 @@ export class ChatComponent implements AfterViewChecked, AfterViewInit, OnInit, O
         body: JSON.stringify({ message_id: msg.dbId, rating }),
       });
     } catch {}
+  }
+
+  // ── Orb engine ───────────────────────────────────────────────────────────────
+
+  private orbInit(canvas: HTMLCanvasElement) {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    this.orbCtx = ctx;
+    this.orbLoop();
+  }
+
+  private orbLoop = () => {
+    const ctx = this.orbCtx;
+    if (!ctx) return;
+    const size = ctx.canvas.width;
+    const cx = size / 2, cy = size / 2;
+    ctx.clearRect(0, 0, size, size);
+
+    const streaming = this.isStreaming();
+    this.orbPhase += streaming ? 0.09 : 0.022;
+
+    // outer pulse glow
+    const glowR = cx * (1 + Math.sin(this.orbPhase * 0.6) * 0.1);
+    const glow  = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR * 1.5);
+    glow.addColorStop(0,   'rgba(120,230,130,0.0)');
+    glow.addColorStop(0.5, 'rgba(76,175,80,0.07)');
+    glow.addColorStop(1,   'rgba(46,125,50,0.0)');
+    ctx.beginPath();
+    ctx.arc(cx, cy, glowR * 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = glow;
+    ctx.fill();
+
+    // morphing body
+    ctx.beginPath();
+    const pts = 64;
+    for (let i = 0; i <= pts; i++) {
+      const a = (i / pts) * Math.PI * 2;
+      const wobble = streaming
+        ? Math.sin(a * 3 + this.orbPhase * 2.2) * 0.13 + Math.sin(a * 5 + this.orbPhase) * 0.07
+        : Math.sin(a * 2 + this.orbPhase)        * 0.04 + Math.sin(a * 4 + this.orbPhase * 0.5) * 0.015;
+      const r = cx * 0.78 * (1 + wobble);
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+
+    // body gradient — brighter/cooler when streaming
+    const grad = ctx.createRadialGradient(cx * 0.62, cy * 0.58, 0, cx, cy, cx);
+    if (streaming) {
+      grad.addColorStop(0,   '#d0fff8');
+      grad.addColorStop(0.4, '#4caf50');
+      grad.addColorStop(1,   '#1a5c20');
+    } else {
+      grad.addColorStop(0,   '#b2dfb2');
+      grad.addColorStop(0.5, '#388e3c');
+      grad.addColorStop(1,   '#1b5e20');
+    }
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // specular highlight
+    const shine = ctx.createRadialGradient(cx * 0.52, cy * 0.42, 0, cx * 0.58, cy * 0.48, cx * 0.38);
+    shine.addColorStop(0, 'rgba(255,255,255,0.5)');
+    shine.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = shine;
+    ctx.fill();
+
+    // ripples
+    this.orbRipples = this.orbRipples.filter(rp => rp.alpha > 0.02);
+    for (const rp of this.orbRipples) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, rp.r, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(160,255,170,${rp.alpha})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      rp.r     += rp.speed;
+      rp.alpha *= 0.91;
+    }
+
+    this.orbFrame = requestAnimationFrame(this.orbLoop);
+  };
+
+  private orbRipple() {
+    this.orbRipples.push({ r: 17, alpha: 0.85, speed: 0.9 });
+    setTimeout(() => this.orbRipples.push({ r: 14, alpha: 0.55, speed: 0.7 }), 120);
   }
 
   // ── Neural network engine ─────────────────────────────────────────────────────
