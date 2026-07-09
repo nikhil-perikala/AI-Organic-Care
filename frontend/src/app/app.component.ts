@@ -45,9 +45,14 @@ const NAV_CENTER: NavTab = {
       }
 
       <aside class="sidebar d-none d-md-flex flex-column">
-        <div class="sidebar-brand px-3 py-4 d-flex align-items-center gap-2 border-bottom">
-          <mat-icon class="text-success">eco</mat-icon>
-          <span class="fw-bold" style="font-size:16px;color:#2e7d32">Organic Care</span>
+        <div class="sidebar-brand px-3 d-flex align-items-center gap-2 border-bottom" style="height:60px">
+          <div style="width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#1b5e20,#4caf50);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <mat-icon style="font-size:18px;color:#fff;width:18px;height:18px">eco</mat-icon>
+          </div>
+          <div>
+            <div class="fw-bold" style="font-size:14px;color:#1a2a1a;line-height:1.1">Organic Care</div>
+            <div style="font-size:10px;color:#81c784;font-weight:600;letter-spacing:0.5px">AI Wellness</div>
+          </div>
         </div>
 
         @if (auth.isLoggedIn()) {
@@ -178,15 +183,6 @@ const NAV_CENTER: NavTab = {
         </nav>
       }
 
-      <!-- Liquid page transition overlay -->
-      @if (transitioning()) {
-        <div class="liquid-overlay" [class.liquid-reveal]="liquidReveal()">
-          <svg class="liquid-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <path class="liquid-blob" [attr.d]="liquidPath()"/>
-          </svg>
-        </div>
-      }
-
       <main class="page-content flex-fill overflow-auto">
         <router-outlet />
         @if (!activeRoute().startsWith('/auth') && !isActive('/chat')) {
@@ -270,23 +266,26 @@ const NAV_CENTER: NavTab = {
     }
 
     .sidebar {
-      width: 240px;
+      width: 220px;
       flex-shrink: 0;
       background: #fff;
-      border-right: 1px solid #e8f0e8;
+      border-right: 1px solid #eaeef0;
       position: sticky;
       top: 0;
       height: 100vh;
       overflow-y: auto;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.03);
     }
 
     .sidebar-link {
-      font-size: 14px;
+      font-size: 13.5px;
       font-weight: 500;
-      color: #555;
+      color: #52616b;
       border-left: 3px solid transparent;
-      transition: all 0.15s;
+      transition: all 0.15s ease;
       cursor: pointer;
+      border-radius: 0 8px 8px 0;
+      margin-right: 8px;
     }
 
     .sidebar-link mat-icon {
@@ -295,7 +294,7 @@ const NAV_CENTER: NavTab = {
     }
 
     .sidebar-link:hover {
-      background: #f2f5f0;
+      background: #f0f7f0;
       color: #2e7d32;
     }
 
@@ -449,32 +448,6 @@ const NAV_CENTER: NavTab = {
       }
     }
 
-    /* ── Idle warning ──────────────────────────────── */
-    /* ── Liquid page transition ── */
-    .liquid-overlay {
-      position: fixed; inset: 0; z-index: 9990;
-      pointer-events: none;
-      animation: liquidIn 0.42s cubic-bezier(0.76, 0, 0.24, 1) forwards;
-    }
-    .liquid-reveal {
-      animation: liquidOut 0.38s cubic-bezier(0.76, 0, 0.24, 1) forwards;
-    }
-    .liquid-svg {
-      width: 100%; height: 100%; display: block;
-    }
-    .liquid-blob {
-      fill: #2e7d32;
-      filter: drop-shadow(0 0 20px rgba(76,175,80,0.4));
-    }
-    @keyframes liquidIn {
-      0%   { clip-path: circle(0% at 50% 100%); }
-      100% { clip-path: circle(150% at 50% 100%); }
-    }
-    @keyframes liquidOut {
-      0%   { clip-path: circle(150% at 50% 0%); }
-      100% { clip-path: circle(0% at 50% 0%); }
-    }
-
     /* ── Offline indicator ── */
     .offline-banner {
       position: sticky; top: 0; z-index: 9998;
@@ -592,17 +565,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
   menuOpen      = signal(false);
   activeRoute   = signal('/');
-  transitioning = signal(false);
-  liquidReveal  = signal(false);
-  liquidPath    = signal('M0,100 Q25,85 50,100 Q75,115 100,100 L100,0 L0,0 Z');
-
-  private triggerTransition() {
-    this.transitioning.set(true);
-    this.liquidReveal.set(false);
-    setTimeout(() => { this.liquidReveal.set(true); }, 420);
-    setTimeout(() => { this.transitioning.set(false); this.liquidReveal.set(false); }, 820);
-  }
-
   // ── Idle session ────────────────────────────────────────────────────────────
   showIdleWarning = signal(false);
   idleSecondsLeft = signal(60);
@@ -637,7 +599,6 @@ export class AppComponent implements OnInit, OnDestroy {
       .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
       .subscribe(event => {
         this.activeRoute.set(event.urlAfterRedirects || event.url);
-        this.triggerTransition();
       });
 
     // Reactively start/stop idle timer whenever login state changes.

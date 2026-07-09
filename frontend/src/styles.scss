@@ -70,17 +70,26 @@ $organic-theme: mat.define-light-theme((
 }
 
 // ── Reset ───────────────────────────────────────────────────────
-* { box-sizing: border-box; }
+*, *::before, *::after { box-sizing: border-box; }
 
 html, body {
   height: 100%;
   margin: 0;
   padding: 0;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background-color: var(--color-bg);
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 14px;
+  line-height: 1.5;
 }
+
+// ── Scrollbar (Webkit) ──────────────────────────────────────────
+::-webkit-scrollbar        { width: 5px; height: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: #c8d8c8; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #a5b8a5; }
 
 // ── Shell wrapper ────────────────────────────────────────────────
 .app-shell {

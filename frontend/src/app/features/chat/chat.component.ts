@@ -1,6 +1,6 @@
-import {
+﻿import {
   Component, signal, ViewChild, ElementRef,
-  AfterViewChecked, AfterViewInit, OnDestroy, NgZone, inject, OnInit, effect,
+  AfterViewChecked, OnDestroy, NgZone, inject, OnInit,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -91,13 +91,11 @@ const STATIC_SUGGESTIONS = [
   template: `
 <div class="chat-page">
 
-  <canvas class="neural-canvas" #neuralCanvas></canvas>
-
   <!-- ── Header ── -->
   <div class="chat-header">
     <div class="chat-header-left">
       <div class="chat-avatar">
-        <canvas class="orb-canvas" #orbCanvas width="40" height="40"></canvas>
+        <div class="chat-avatar-orb">🌿</div>
       </div>
       <div>
         <div class="chat-name">Organic Care AI</div>
@@ -288,14 +286,6 @@ const STATIC_SUGGESTIONS = [
       background: #f4f7f4;
       position: relative; overflow: hidden;
     }
-    .neural-canvas {
-      position: absolute; inset: 0;
-      width: 100%; height: 100%;
-      pointer-events: none; z-index: 0; opacity: 0.55;
-    }
-    .chat-header, .chat-messages, .chat-input-row {
-      position: relative; z-index: 1;
-    }
 
     /* ── Header ─────────────────────────────────────── */
     .chat-header {
@@ -447,13 +437,14 @@ const STATIC_SUGGESTIONS = [
     .orb-mini {
       width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
       background: radial-gradient(circle at 38% 32%, #b2dfb2 0%, #388e3c 45%, #1b5e20 100%);
-      animation: orbBreath 3s ease-in-out infinite;
     }
-    @keyframes orbBreath {
-      0%,100% { box-shadow: 0 0 6px rgba(76,175,80,0.3) inset; }
-      50%      { box-shadow: 0 0 14px rgba(120,230,130,0.55) inset; }
+    .chat-avatar-orb {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: linear-gradient(135deg, #1b5e20, #4caf50);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 2px 8px rgba(46,125,50,0.35);
     }
-    .orb-canvas { display: block; border-radius: 50%; }
 
     /* Bubbles */
     .bubble {
@@ -590,42 +581,14 @@ const STATIC_SUGGESTIONS = [
     }
   `],
 })
-export class ChatComponent implements AfterViewChecked, AfterViewInit, OnInit, OnDestroy {
-  @ViewChild('messagesEl')   private messagesEl?:    ElementRef<HTMLDivElement>;
-  @ViewChild('neuralCanvas') private neuralCanvas!:  ElementRef<HTMLCanvasElement>;
-  @ViewChild('orbCanvas')    private orbCanvas!:     ElementRef<HTMLCanvasElement>;
+export class ChatComponent implements AfterViewChecked, OnInit, OnDestroy {
+  @ViewChild('messagesEl') private messagesEl?: ElementRef<HTMLDivElement>;
 
   auth              = inject(AuthService);
   private zone      = inject(NgZone);
   private sanitizer = inject(DomSanitizer);
   private route     = inject(ActivatedRoute);
   private readonly apiUrl = environment.apiUrl;
-
-  // ── Neural network state ─────────────────────────────────────────────────
-  private nnCtx!:    CanvasRenderingContext2D;
-  private nnFrame =  0;
-  private nnNodes:   Array<{x:number;y:number;vx:number;vy:number;glow:number}> = [];
-  private nnPulses:  Array<{from:number;to:number;t:number;speed:number}> = [];
-  private nnResize!: () => void;
-
-  // ── Orb state ─────────────────────────────────────────────────────────────
-  private orbCtx!:     CanvasRenderingContext2D;
-  private orbFrame =   0;
-  private orbPhase =   0;
-  private orbRipples:  Array<{r:number;alpha:number;speed:number}> = [];
-
-  constructor() {
-    effect(() => {
-      if (this.isStreaming()) {
-        this.zone.runOutsideAngular(() => this.nnWave());
-      }
-    });
-    effect(() => {
-      if (this.isRecording()) {
-        this.zone.runOutsideAngular(() => this.orbRipple());
-      }
-    });
-  }
 
   readonly moods = MOODS;
 
@@ -687,34 +650,8 @@ export class ChatComponent implements AfterViewChecked, AfterViewInit, OnInit, O
     }
   }
 
-  ngAfterViewInit() {
-    this.zone.runOutsideAngular(() => {
-      // neural network
-      const nnCanvas = this.neuralCanvas?.nativeElement;
-      if (nnCanvas) {
-        const ctx = nnCanvas.getContext('2d');
-        if (ctx) {
-          this.nnCtx = ctx;
-          this.nnResize = () => {
-            nnCanvas.width  = nnCanvas.clientWidth;
-            nnCanvas.height = nnCanvas.clientHeight;
-            this.nnBuildNodes();
-          };
-          this.nnResize();
-          window.addEventListener('resize', this.nnResize);
-          this.nnLoop();
-        }
-      }
-      // AI orb
-      const orbEl = this.orbCanvas?.nativeElement;
-      if (orbEl) { this.orbInit(orbEl); }
-    });
-  }
-
   ngOnDestroy() {
-    cancelAnimationFrame(this.nnFrame);
-    cancelAnimationFrame(this.orbFrame);
-    window.removeEventListener('resize', this.nnResize);
+    this.recognition?.stop();
   }
 
   private restoreFromCache() {
@@ -988,210 +925,6 @@ export class ChatComponent implements AfterViewChecked, AfterViewInit, OnInit, O
         body: JSON.stringify({ message_id: msg.dbId, rating }),
       });
     } catch {}
-  }
-
-  // ── Orb engine ───────────────────────────────────────────────────────────────
-
-  private orbInit(canvas: HTMLCanvasElement) {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    this.orbCtx = ctx;
-    this.orbLoop();
-  }
-
-  private orbLoop = () => {
-    const ctx = this.orbCtx;
-    if (!ctx) return;
-    const size = ctx.canvas.width;
-    const cx = size / 2, cy = size / 2;
-    ctx.clearRect(0, 0, size, size);
-
-    const streaming = this.isStreaming();
-    this.orbPhase += streaming ? 0.09 : 0.022;
-
-    // outer pulse glow
-    const glowR = cx * (1 + Math.sin(this.orbPhase * 0.6) * 0.1);
-    const glow  = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR * 1.5);
-    glow.addColorStop(0,   'rgba(120,230,130,0.0)');
-    glow.addColorStop(0.5, 'rgba(76,175,80,0.07)');
-    glow.addColorStop(1,   'rgba(46,125,50,0.0)');
-    ctx.beginPath();
-    ctx.arc(cx, cy, glowR * 1.5, 0, Math.PI * 2);
-    ctx.fillStyle = glow;
-    ctx.fill();
-
-    // morphing body
-    ctx.beginPath();
-    const pts = 64;
-    for (let i = 0; i <= pts; i++) {
-      const a = (i / pts) * Math.PI * 2;
-      const wobble = streaming
-        ? Math.sin(a * 3 + this.orbPhase * 2.2) * 0.13 + Math.sin(a * 5 + this.orbPhase) * 0.07
-        : Math.sin(a * 2 + this.orbPhase)        * 0.04 + Math.sin(a * 4 + this.orbPhase * 0.5) * 0.015;
-      const r = cx * 0.78 * (1 + wobble);
-      const x = cx + Math.cos(a) * r;
-      const y = cy + Math.sin(a) * r;
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-
-    // body gradient — brighter/cooler when streaming
-    const grad = ctx.createRadialGradient(cx * 0.62, cy * 0.58, 0, cx, cy, cx);
-    if (streaming) {
-      grad.addColorStop(0,   '#d0fff8');
-      grad.addColorStop(0.4, '#4caf50');
-      grad.addColorStop(1,   '#1a5c20');
-    } else {
-      grad.addColorStop(0,   '#b2dfb2');
-      grad.addColorStop(0.5, '#388e3c');
-      grad.addColorStop(1,   '#1b5e20');
-    }
-    ctx.fillStyle = grad;
-    ctx.fill();
-
-    // specular highlight
-    const shine = ctx.createRadialGradient(cx * 0.52, cy * 0.42, 0, cx * 0.58, cy * 0.48, cx * 0.38);
-    shine.addColorStop(0, 'rgba(255,255,255,0.5)');
-    shine.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = shine;
-    ctx.fill();
-
-    // ripples
-    this.orbRipples = this.orbRipples.filter(rp => rp.alpha > 0.02);
-    for (const rp of this.orbRipples) {
-      ctx.beginPath();
-      ctx.arc(cx, cy, rp.r, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(160,255,170,${rp.alpha})`;
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      rp.r     += rp.speed;
-      rp.alpha *= 0.91;
-    }
-
-    this.orbFrame = requestAnimationFrame(this.orbLoop);
-  };
-
-  private orbRipple() {
-    this.orbRipples.push({ r: 17, alpha: 0.85, speed: 0.9 });
-    setTimeout(() => this.orbRipples.push({ r: 14, alpha: 0.55, speed: 0.7 }), 120);
-  }
-
-  // ── Neural network engine ─────────────────────────────────────────────────────
-
-  private nnBuildNodes() {
-    const { width: w, height: h } = this.nnCtx.canvas;
-    const count = Math.min(60, Math.floor(w * h / 10000));
-    this.nnNodes = Array.from({ length: count }, () => ({
-      x: Math.random() * w, y: Math.random() * h,
-      vx: (Math.random() - 0.5) * 0.35,
-      vy: (Math.random() - 0.5) * 0.35,
-      glow: 0,
-    }));
-    this.nnPulses = [];
-  }
-
-  private nnLoop = () => {
-    const ctx = this.nnCtx;
-    if (!ctx) return;
-    const { width: w, height: h } = ctx.canvas;
-    ctx.clearRect(0, 0, w, h);
-
-    const nodes = this.nnNodes;
-    const MAX_D = 140;
-
-    // drift nodes
-    for (const n of nodes) {
-      n.x += n.vx; n.y += n.vy;
-      if (n.x < 0 || n.x > w) n.vx *= -1;
-      if (n.y < 0 || n.y > h) n.vy *= -1;
-      n.glow = Math.max(0, n.glow - 0.016);
-    }
-
-    // connections
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        const dx = nodes[i].x - nodes[j].x;
-        const dy = nodes[i].y - nodes[j].y;
-        const d  = Math.sqrt(dx * dx + dy * dy);
-        if (d < MAX_D) {
-          const g = Math.max(nodes[i].glow, nodes[j].glow);
-          ctx.strokeStyle = `rgba(100,200,110,${(1 - d / MAX_D) * (0.1 + g * 0.3)})`;
-          ctx.lineWidth   = 0.5 + g * 1.2;
-          ctx.beginPath();
-          ctx.moveTo(nodes[i].x, nodes[i].y);
-          ctx.lineTo(nodes[j].x, nodes[j].y);
-          ctx.stroke();
-        }
-      }
-    }
-
-    // pulses
-    this.nnPulses = this.nnPulses.filter(p => p.t < 1);
-    for (const p of this.nnPulses) {
-      p.t = Math.min(1, p.t + p.speed);
-      const a = nodes[p.from], b = nodes[p.to];
-      if (!a || !b) continue;
-      const px = a.x + (b.x - a.x) * p.t;
-      const py = a.y + (b.y - a.y) * p.t;
-      const alpha = Math.sin(p.t * Math.PI);
-      // glow halo
-      ctx.beginPath();
-      ctx.arc(px, py, 7, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(120,230,130,${alpha * 0.12})`;
-      ctx.fill();
-      // bright core
-      ctx.beginPath();
-      ctx.arc(px, py, 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(180,255,190,${alpha * 0.95})`;
-      ctx.fill();
-      if (p.t > 0.85) b.glow = Math.min(1, b.glow + 0.45);
-    }
-
-    // idle random pulse
-    if (Math.random() < 0.04) this.nnFire();
-
-    // nodes
-    for (const n of nodes) {
-      const r = 1.8 + n.glow * 2.5;
-      if (n.glow > 0.15) {
-        ctx.beginPath();
-        ctx.arc(n.x, n.y, r * 4, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(100,200,110,${n.glow * 0.07})`;
-        ctx.fill();
-      }
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(100,200,110,${0.3 + n.glow * 0.6})`;
-      ctx.fill();
-    }
-
-    this.nnFrame = requestAnimationFrame(this.nnLoop);
-  };
-
-  private nnFire(fromIdx?: number) {
-    const nodes = this.nnNodes;
-    if (nodes.length < 2) return;
-    const from = fromIdx ?? Math.floor(Math.random() * nodes.length);
-    const near = nodes
-      .map((n, i) => ({ i, d: Math.hypot(n.x - nodes[from].x, n.y - nodes[from].y) }))
-      .filter(c => c.i !== from && c.d < 140)
-      .sort((a, b) => a.d - b.d)
-      .slice(0, 4);
-    if (!near.length) return;
-    const to = near[Math.floor(Math.random() * near.length)].i;
-    this.nnPulses.push({ from, to, t: 0, speed: 0.011 + Math.random() * 0.009 });
-  }
-
-  private nnWave() {
-    for (let i = 0; i < 12; i++) {
-      setTimeout(() => {
-        const from = Math.floor(Math.random() * this.nnNodes.length);
-        this.nnNodes[from].glow = 1;
-        this.nnFire(from);
-        this.nnFire(from);
-        this.nnFire(from);
-      }, i * 60);
-    }
   }
 
   // ── Rendering ─────────────────────────────────────────────────────────────────

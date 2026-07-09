@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, NgZone, effect } from '@angular/core';
+﻿import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -149,22 +149,18 @@ function getGreeting(): string {
   template: `
 <div class="home-page">
 
-  <!-- ── AI Awakening intro overlay ───────────────────────── -->
-  @if (!awakeningDone()) {
-    <canvas class="awakening-canvas" #awakeningCanvas></canvas>
-  }
-
   <!-- ── S1: Greeting banner ─────────────────────────────── -->
-  <div class="greeting-banner px-4 py-3">
-    <div class="d-flex align-items-center gap-3">
-      <div class="health-logo flex-shrink-0">
-        <mat-icon style="font-size:24px;color:#2e7d32">eco</mat-icon>
-      </div>
+  <div class="greeting-banner px-4 py-4">
+    <div class="d-flex align-items-center justify-content-between">
       <div>
-        <h1 class="fw-bold text-white mb-0" style="font-size:clamp(16px,4vw,22px);line-height:1.2">
-          {{ greeting }}, {{ userName }} 👋
+        <p class="mb-1 text-uppercase fw-semibold" style="font-size:10px;letter-spacing:1.5px;color:rgba(255,255,255,0.55)">{{ greeting }}</p>
+        <h1 class="fw-bold text-white mb-0" style="font-size:clamp(20px,5vw,28px);line-height:1.15;letter-spacing:-0.3px">
+          {{ userName }}
         </h1>
-        <p class="mb-0 small" style="color:rgba(255,255,255,0.65)">Eat Organic, Live Healthy</p>
+        <p class="mb-0 mt-1" style="color:rgba(255,255,255,0.6);font-size:13px">Your AI-powered organic wellness companion</p>
+      </div>
+      <div class="greeting-avatar">
+        <mat-icon style="font-size:26px;color:#fff">eco</mat-icon>
       </div>
     </div>
   </div>
@@ -218,12 +214,6 @@ function getGreeting(): string {
       </div>
     </div>
   }
-
-  <!-- ── AI Consciousness Dashboard ──────────────────────── -->
-  <div class="cs-card mx-3 mx-md-4 mt-3">
-    <div class="cs-label">AI Consciousness</div>
-    <canvas class="cs-canvas" #consciousnessCanvas></canvas>
-  </div>
 
   <!-- ── S1b: Hero carousel ───────────────────────────────── -->
   <div class="hero-card mx-3 mx-md-4 mt-3">
@@ -633,51 +623,22 @@ function getGreeting(): string {
 </div>
   `,
   styles: [`
-    /* ── AI Consciousness Dashboard ── */
-    .cs-card {
-      position: relative;
-      border-radius: 20px;
-      overflow: hidden;
-      background: #030b03;
-      height: 200px;
-    }
-    @media (min-width: 768px) { .cs-card { height: 260px; } }
-    .cs-canvas {
-      width: 100%; height: 100%;
-      display: block;
-    }
-    .cs-label {
-      position: absolute;
-      top: 12px; left: 16px;
-      font-size: 11px; font-weight: 600;
-      color: rgba(150,220,150,0.55);
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    /* ── AI Awakening canvas ── */
-    .awakening-canvas {
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      z-index: 9999;
-      pointer-events: none;
-      display: block;
-    }
-
-    .home-page { padding-bottom: 88px; position: relative; }
+    .home-page { padding-bottom: 88px; }
 
     .section-title { font-size: 16px; font-weight: 700; color: #1a2a1a; }
 
-    /* Greeting */
+    /* ── Greeting ── */
     .greeting-banner {
-      background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 60%, #43a047 100%);
+      background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 55%, #388e3c 100%);
+    }
+    .greeting-avatar {
+      width: 52px; height: 52px; border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
     }
     @media (min-width: 768px) {
-      .greeting-banner { border-radius: 0 0 20px 20px; }
+      .greeting-banner { border-radius: 0 0 24px 24px; }
       .home-page { padding-bottom: 40px; max-width: 1100px; margin: 0 auto; }
     }
 
@@ -918,19 +879,11 @@ function getGreeting(): string {
     }
   `],
 })
-export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
+export class HomeComponent implements OnInit, OnDestroy {
   router  = inject(Router);
   auth    = inject(AuthService);
   favSvc  = inject(FavoritesService);
   private http = inject(HttpClient);
-  private zone = inject(NgZone);
-
-  @ViewChild('awakeningCanvas')     private awakeningCanvasRef?: ElementRef<HTMLCanvasElement>;
-  @ViewChild('consciousnessCanvas') private csCanvasRef?: ElementRef<HTMLCanvasElement>;
-
-  awakeningDone = signal(!!localStorage.getItem('organic_care_awakened'));
-  private awFrame = 0;
-  private csFrame = 0;
 
   greeting    = getGreeting();
   imgFallback = IMG_FALLBACK;
@@ -975,28 +928,8 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  constructor() {
-    // Start consciousness canvas once awakening is finished
-    effect(() => {
-      if (this.awakeningDone()) {
-        setTimeout(() => this.zone.runOutsideAngular(() => this.csInit()), 50);
-      }
-    });
-  }
-
-  ngAfterViewInit() {
-    if (!this.awakeningDone() && this.awakeningCanvasRef) {
-      this.zone.runOutsideAngular(() => this.runAwakening());
-    } else {
-      // First visit already done — start consciousness immediately
-      this.zone.runOutsideAngular(() => this.csInit());
-    }
-  }
-
   ngOnDestroy() {
     clearInterval(this.heroInterval);
-    cancelAnimationFrame(this.awFrame);
-    cancelAnimationFrame(this.csFrame);
   }
 
   private startHeroSlider() {
@@ -1071,301 +1004,6 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   parseSteps(instructions: string | null): string[] {
     if (!instructions) return [];
     return instructions.split(/\n+|\d+\.\s+/).map(s => s.trim()).filter(Boolean);
-  }
-
-  private csInit() {
-    const canvas = this.csCanvasRef?.nativeElement;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d')!;
-
-    const setSize = () => {
-      canvas.width  = canvas.offsetWidth  || 360;
-      canvas.height = canvas.offsetHeight || 200;
-    };
-    setSize();
-    const resize = () => { setSize(); };
-    window.addEventListener('resize', resize);
-
-    interface Satellite {
-      angle: number;
-      speed: number;
-      orbitR: number;
-      r: number;
-      color: string;
-      glow: string;
-      label: string;
-      getValue: () => string;
-    }
-
-    const isLoggedIn = this.auth.isLoggedIn.bind(this.auth);
-
-    const satellites: Satellite[] = [
-      { angle: 0,              speed: 0.007, orbitR: 0, r: 18, color: '#4caf50', glow: '#81c784', label: 'Pantry',   getValue: () => isLoggedIn() ? String(this.pantryCount())   : '∞' },
-      { angle: Math.PI / 2,   speed: 0.011, orbitR: 0, r: 18, color: '#ff7043', glow: '#ffab91', label: 'Expiring',  getValue: () => isLoggedIn() ? String(this.expiringCount()) : '0' },
-      { angle: Math.PI,        speed: 0.009, orbitR: 0, r: 18, color: '#42a5f5', glow: '#90caf9', label: 'Recipes',  getValue: () => '500+' },
-      { angle: 3 * Math.PI / 2, speed: 0.013, orbitR: 0, r: 18, color: '#ab47bc', glow: '#ce93d8', label: 'AI IQ',  getValue: () => '99%' },
-    ];
-
-    const loop = (now: number) => {
-      const W = canvas.width, H = canvas.height;
-      const CX = W / 2, CY = H / 2;
-      const orbR = Math.min(W, H) * 0.18;
-      const satOrbitR = Math.min(W, H) * 0.36;
-
-      // update satellite orbit radii each frame (canvas may resize)
-      for (const s of satellites) s.orbitR = satOrbitR;
-
-      ctx.clearRect(0, 0, W, H);
-
-      // Background
-      const bg = ctx.createRadialGradient(CX, CY, 0, CX, CY, Math.max(W, H) * 0.6);
-      bg.addColorStop(0, '#0d1f0d');
-      bg.addColorStop(1, '#030b03');
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, W, H);
-
-      // Grid rings
-      ctx.strokeStyle = 'rgba(100,200,100,0.06)';
-      ctx.lineWidth = 1;
-      for (let ring = 1; ring <= 3; ring++) {
-        ctx.beginPath();
-        ctx.arc(CX, CY, satOrbitR * ring * 0.45, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      // ── Central orb ──────────────────────────────────────────────────────
-      const pulse = 0.5 + 0.5 * Math.sin(now * 0.0025);
-      const wobble = orbR * (0.92 + 0.08 * pulse);
-
-      // Outer aura
-      const aura = ctx.createRadialGradient(CX, CY, 0, CX, CY, wobble * 2.8);
-      aura.addColorStop(0, `rgba(76,175,80,${0.18 + pulse * 0.12})`);
-      aura.addColorStop(0.5, `rgba(76,175,80,0.04)`);
-      aura.addColorStop(1, 'transparent');
-      ctx.beginPath();
-      ctx.arc(CX, CY, wobble * 2.8, 0, Math.PI * 2);
-      ctx.fillStyle = aura;
-      ctx.fill();
-
-      // Orb body — morphing polygon via bezier
-      ctx.save();
-      ctx.translate(CX, CY);
-      ctx.beginPath();
-      const pts = 8;
-      for (let i = 0; i <= pts; i++) {
-        const theta = (i / pts) * Math.PI * 2;
-        const r = wobble * (1 + 0.07 * Math.sin(now * 0.002 + i * 1.3));
-        const x = Math.cos(theta) * r;
-        const y = Math.sin(theta) * r;
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      const bodyGrad = ctx.createRadialGradient(-wobble * 0.3, -wobble * 0.3, 0, 0, 0, wobble);
-      bodyGrad.addColorStop(0, '#ffffff');
-      bodyGrad.addColorStop(0.3, '#81c784');
-      bodyGrad.addColorStop(0.7, '#2e7d32');
-      bodyGrad.addColorStop(1, '#1b5e20');
-      ctx.fillStyle = bodyGrad;
-      ctx.shadowColor = '#4caf50';
-      ctx.shadowBlur  = 18 + pulse * 12;
-      ctx.fill();
-      ctx.restore();
-
-      // Orb label
-      ctx.font = `bold ${Math.round(orbR * 0.35)}px "Segoe UI", sans-serif`;
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.shadowBlur = 0;
-      ctx.fillText('🌿', CX, CY);
-
-      // ── Satellites ───────────────────────────────────────────────────────
-      for (const sat of satellites) {
-        sat.angle += sat.speed;
-        const sx = CX + Math.cos(sat.angle) * sat.orbitR;
-        const sy = CY + Math.sin(sat.angle) * sat.orbitR;
-
-        // Orbit trail line
-        ctx.beginPath();
-        ctx.moveTo(CX, CY);
-        ctx.lineTo(sx, sy);
-        ctx.strokeStyle = sat.color + '22';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // Satellite glow
-        const satAura = ctx.createRadialGradient(sx, sy, 0, sx, sy, sat.r * 2.5);
-        satAura.addColorStop(0, sat.glow + '55');
-        satAura.addColorStop(1, 'transparent');
-        ctx.beginPath();
-        ctx.arc(sx, sy, sat.r * 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = satAura;
-        ctx.fill();
-
-        // Satellite body
-        const satGrad = ctx.createRadialGradient(sx - sat.r * 0.3, sy - sat.r * 0.3, 0, sx, sy, sat.r);
-        satGrad.addColorStop(0, '#ffffff');
-        satGrad.addColorStop(0.4, sat.color);
-        satGrad.addColorStop(1, sat.color + 'aa');
-        ctx.beginPath();
-        ctx.arc(sx, sy, sat.r, 0, Math.PI * 2);
-        ctx.fillStyle = satGrad;
-        ctx.shadowColor = sat.glow;
-        ctx.shadowBlur  = 10;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-
-        // Satellite value + label
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.font = `bold ${Math.round(sat.r * 0.7)}px "Segoe UI", sans-serif`;
-        ctx.fillStyle = '#fff';
-        ctx.fillText(sat.getValue(), sx, sy - 2);
-
-        ctx.font = `${Math.round(sat.r * 0.5)}px "Segoe UI", sans-serif`;
-        ctx.fillStyle = sat.glow;
-        ctx.fillText(sat.label, sx, sy + sat.r + 10);
-      }
-
-      this.csFrame = requestAnimationFrame(loop);
-    };
-
-    this.csFrame = requestAnimationFrame(loop);
-    // Clean up on component destroy — handled by ngOnDestroy
-    canvas.addEventListener('remove', () => {
-      window.removeEventListener('resize', resize);
-      cancelAnimationFrame(this.csFrame);
-    });
-  }
-
-  private runAwakening() {
-    const canvas = this.awakeningCanvasRef!.nativeElement;
-    const ctx = canvas.getContext('2d')!;
-
-    const resize = () => {
-      canvas.width  = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    resize();
-
-    const W = canvas.width, H = canvas.height;
-    const CX = W / 2, CY = H / 2;
-    const TOTAL = 2500;          // ms for full animation
-    const HOLD  = 600;           // ms logo holds after converge
-    const FADE  = 400;           // ms fade-out
-
-    // Build particle cloud
-    interface Particle {
-      x: number; y: number;
-      tx: number; ty: number;   // target (near centre)
-      vx: number; vy: number;
-      r: number;
-      color: string;
-      phase: number;
-    }
-
-    const colors = ['#4caf50','#81c784','#a5d6a7','#ffffff','#c8e6c9','#66bb6a'];
-    const N = Math.min(Math.floor(W * H / 400), 1800);
-    const particles: Particle[] = Array.from({ length: N }, () => {
-      const angle = Math.random() * Math.PI * 2;
-      const dist  = Math.random() * Math.max(W, H) * 0.6 + Math.max(W, H) * 0.1;
-      return {
-        x: CX + Math.cos(angle) * dist,
-        y: CY + Math.sin(angle) * dist,
-        tx: CX + (Math.random() - 0.5) * 180,
-        ty: CY + (Math.random() - 0.5) * 50,
-        vx: 0, vy: 0,
-        r: Math.random() * 1.8 + 0.4,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        phase: Math.random() * Math.PI * 2,
-      };
-    });
-
-    const start = performance.now();
-    let exploding = false;
-
-    const loop = (now: number) => {
-      const elapsed = now - start;
-      const convergeT = Math.min(elapsed / (TOTAL - HOLD - FADE), 1);
-      const ease = 1 - Math.pow(1 - convergeT, 3); // cubic ease-in-out
-
-      ctx.clearRect(0, 0, W, H);
-
-      // Background: dark green fading as particles converge
-      const bgAlpha = 0.92 - ease * 0.55;
-      ctx.fillStyle = `rgba(5, 18, 5, ${bgAlpha})`;
-      ctx.fillRect(0, 0, W, H);
-
-      // Draw particles
-      for (const p of particles) {
-        if (exploding) {
-          p.x += p.vx;
-          p.y += p.vy;
-          p.vx *= 0.97;
-          p.vy *= 0.97;
-        } else {
-          p.x += (p.tx - p.x) * ease * 0.12;
-          p.y += (p.ty - p.y) * ease * 0.12;
-        }
-        const glow = 0.5 + 0.5 * Math.sin(now * 0.003 + p.phase);
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r * (1 + glow * 0.6), 0, Math.PI * 2);
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = 0.5 + glow * 0.5;
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      }
-
-      // Logo text glow when mostly converged
-      if (convergeT > 0.65) {
-        const textAlpha = Math.min((convergeT - 0.65) / 0.35, 1);
-        const glowPulse = 0.5 + 0.5 * Math.sin(now * 0.004);
-
-        ctx.save();
-        ctx.globalAlpha = textAlpha * (exploding ? Math.max(0, 1 - (elapsed - (TOTAL - FADE)) / FADE) : 1);
-
-        // Outer glow
-        ctx.shadowColor = '#4caf50';
-        ctx.shadowBlur  = 30 + glowPulse * 20;
-
-        ctx.textAlign    = 'center';
-        ctx.textBaseline = 'middle';
-
-        ctx.font = `bold ${Math.min(W * 0.06, 42)}px "Segoe UI", sans-serif`;
-        ctx.fillStyle = '#c8e6c9';
-        ctx.fillText('🌿 Organic Care', CX, CY - 18);
-
-        ctx.shadowBlur = 0;
-        ctx.font = `${Math.min(W * 0.028, 18)}px "Segoe UI", sans-serif`;
-        ctx.fillStyle = 'rgba(200,230,200,0.7)';
-        ctx.fillText('Your AI Wellness Companion', CX, CY + 22);
-
-        ctx.restore();
-      }
-
-      // Trigger explosion + fade
-      if (!exploding && elapsed >= TOTAL - HOLD - FADE) {
-        exploding = true;
-        for (const p of particles) {
-          const ang = Math.atan2(p.y - CY, p.x - CX);
-          const spd = Math.random() * 8 + 3;
-          p.vx = Math.cos(ang) * spd;
-          p.vy = Math.sin(ang) * spd;
-        }
-      }
-
-      if (elapsed < TOTAL) {
-        this.awFrame = requestAnimationFrame(loop);
-      } else {
-        // Fully done — mark complete and remove overlay
-        this.zone.run(() => {
-          localStorage.setItem('organic_care_awakened', '1');
-          this.awakeningDone.set(true);
-        });
-      }
-    };
-
-    this.awFrame = requestAnimationFrame(loop);
   }
 
   goToPantry()       { this.router.navigate(['/pantry']); }
