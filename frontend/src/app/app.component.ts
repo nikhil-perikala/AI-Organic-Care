@@ -178,6 +178,15 @@ const NAV_CENTER: NavTab = {
         </nav>
       }
 
+      <!-- Liquid page transition overlay -->
+      @if (transitioning()) {
+        <div class="liquid-overlay" [class.liquid-reveal]="liquidReveal()">
+          <svg class="liquid-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <path class="liquid-blob" [attr.d]="liquidPath()"/>
+          </svg>
+        </div>
+      }
+
       <main class="page-content flex-fill overflow-auto">
         <router-outlet />
         @if (!activeRoute().startsWith('/auth') && !isActive('/chat')) {
@@ -441,6 +450,32 @@ const NAV_CENTER: NavTab = {
     }
 
     /* ── Idle warning ──────────────────────────────── */
+    /* ── Liquid page transition ── */
+    .liquid-overlay {
+      position: fixed; inset: 0; z-index: 9990;
+      pointer-events: none;
+      animation: liquidIn 0.42s cubic-bezier(0.76, 0, 0.24, 1) forwards;
+    }
+    .liquid-reveal {
+      animation: liquidOut 0.38s cubic-bezier(0.76, 0, 0.24, 1) forwards;
+    }
+    .liquid-svg {
+      width: 100%; height: 100%; display: block;
+    }
+    .liquid-blob {
+      fill: #2e7d32;
+      filter: drop-shadow(0 0 20px rgba(76,175,80,0.4));
+    }
+    @keyframes liquidIn {
+      0%   { clip-path: circle(0% at 50% 100%); }
+      100% { clip-path: circle(150% at 50% 100%); }
+    }
+    @keyframes liquidOut {
+      0%   { clip-path: circle(150% at 50% 0%); }
+      100% { clip-path: circle(0% at 50% 0%); }
+    }
+
+    /* ── Offline indicator ── */
     .offline-banner {
       position: sticky; top: 0; z-index: 9998;
       background: #1a1a1a; color: #fff;
@@ -555,8 +590,18 @@ export class AppComponent implements OnInit, OnDestroy {
 
   allNavItems: NavTab[] = [...this.navLeft, this.navCenter, ...this.navRight];
 
-  menuOpen    = signal(false);
-  activeRoute = signal('/');
+  menuOpen      = signal(false);
+  activeRoute   = signal('/');
+  transitioning = signal(false);
+  liquidReveal  = signal(false);
+  liquidPath    = signal('M0,100 Q25,85 50,100 Q75,115 100,100 L100,0 L0,0 Z');
+
+  private triggerTransition() {
+    this.transitioning.set(true);
+    this.liquidReveal.set(false);
+    setTimeout(() => { this.liquidReveal.set(true); }, 420);
+    setTimeout(() => { this.transitioning.set(false); this.liquidReveal.set(false); }, 820);
+  }
 
   // ── Idle session ────────────────────────────────────────────────────────────
   showIdleWarning = signal(false);
@@ -592,6 +637,7 @@ export class AppComponent implements OnInit, OnDestroy {
       .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
       .subscribe(event => {
         this.activeRoute.set(event.urlAfterRedirects || event.url);
+        this.triggerTransition();
       });
 
     // Reactively start/stop idle timer whenever login state changes.
