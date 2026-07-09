@@ -1,6 +1,6 @@
 import {
   Component, signal, ViewChild, ElementRef,
-  AfterViewChecked, NgZone, inject, OnInit,
+  AfterViewChecked, AfterViewInit, OnDestroy, NgZone, inject, OnInit, effect,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -90,6 +90,8 @@ const STATIC_SUGGESTIONS = [
   imports: [CommonModule, FormsModule, MatIconModule],
   template: `
 <div class="chat-page">
+
+  <canvas class="neural-canvas" #neuralCanvas></canvas>
 
   <!-- ── Header ── -->
   <div class="chat-header">
@@ -284,6 +286,15 @@ const STATIC_SUGGESTIONS = [
       display: flex; flex-direction: column;
       height: calc(100vh - 64px);
       background: #f4f7f4;
+      position: relative; overflow: hidden;
+    }
+    .neural-canvas {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      pointer-events: none; z-index: 0; opacity: 0.55;
+    }
+    .chat-header, .chat-messages, .chat-input-row {
+      position: relative; z-index: 1;
     }
 
     /* ── Header ─────────────────────────────────────── */
@@ -568,14 +579,31 @@ const STATIC_SUGGESTIONS = [
     }
   `],
 })
-export class ChatComponent implements AfterViewChecked, OnInit {
-  @ViewChild('messagesEl') private messagesEl?: ElementRef<HTMLDivElement>;
+export class ChatComponent implements AfterViewChecked, AfterViewInit, OnInit, OnDestroy {
+  @ViewChild('messagesEl')   private messagesEl?:    ElementRef<HTMLDivElement>;
+  @ViewChild('neuralCanvas') private neuralCanvas!:  ElementRef<HTMLCanvasElement>;
 
-  auth      = inject(AuthService);
+  auth              = inject(AuthService);
   private zone      = inject(NgZone);
   private sanitizer = inject(DomSanitizer);
   private route     = inject(ActivatedRoute);
   private readonly apiUrl = environment.apiUrl;
+
+  // ── Neural network state ─────────────────────────────────────────────────
+  private nnCtx!:    CanvasRenderingContext2D;
+  private nnFrame =  0;
+  private nnNodes:   Array<{x:number;y:number;vx:number;vy:number;glow:number}> = [];
+  private nnPulses:  Array<{from:number;to:number;t:number;speed:number}> = [];
+  private nnResize!: () => void;
+
+  constructor() {
+    // trigger AI wave whenever streaming starts
+    effect(() => {
+      if (this.isStreaming()) {
+        this.zone.runOutsideAngular(() => this.nnWave());
+      }
+    });
+  }
 
   readonly moods = MOODS;
 
@@ -635,6 +663,29 @@ export class ChatComponent implements AfterViewChecked, OnInit {
         this.loadPantryData();
       }
     }
+  }
+
+  ngAfterViewInit() {
+    this.zone.runOutsideAngular(() => {
+      const canvas = this.neuralCanvas?.nativeElement;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      this.nnCtx = ctx;
+      this.nnResize = () => {
+        canvas.width  = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+        this.nnBuildNodes();
+      };
+      this.nnResize();
+      window.addEventListener('resize', this.nnResize);
+      this.nnLoop();
+    });
+  }
+
+  ngOnDestroy() {
+    cancelAnimationFrame(this.nnFrame);
+    window.removeEventListener('resize', this.nnResize);
   }
 
   private restoreFromCache() {
@@ -908,6 +959,124 @@ export class ChatComponent implements AfterViewChecked, OnInit {
         body: JSON.stringify({ message_id: msg.dbId, rating }),
       });
     } catch {}
+  }
+
+  // ── Neural network engine ─────────────────────────────────────────────────────
+
+  private nnBuildNodes() {
+    const { width: w, height: h } = this.nnCtx.canvas;
+    const count = Math.min(60, Math.floor(w * h / 10000));
+    this.nnNodes = Array.from({ length: count }, () => ({
+      x: Math.random() * w, y: Math.random() * h,
+      vx: (Math.random() - 0.5) * 0.35,
+      vy: (Math.random() - 0.5) * 0.35,
+      glow: 0,
+    }));
+    this.nnPulses = [];
+  }
+
+  private nnLoop = () => {
+    const ctx = this.nnCtx;
+    if (!ctx) return;
+    const { width: w, height: h } = ctx.canvas;
+    ctx.clearRect(0, 0, w, h);
+
+    const nodes = this.nnNodes;
+    const MAX_D = 140;
+
+    // drift nodes
+    for (const n of nodes) {
+      n.x += n.vx; n.y += n.vy;
+      if (n.x < 0 || n.x > w) n.vx *= -1;
+      if (n.y < 0 || n.y > h) n.vy *= -1;
+      n.glow = Math.max(0, n.glow - 0.016);
+    }
+
+    // connections
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const dx = nodes[i].x - nodes[j].x;
+        const dy = nodes[i].y - nodes[j].y;
+        const d  = Math.sqrt(dx * dx + dy * dy);
+        if (d < MAX_D) {
+          const g = Math.max(nodes[i].glow, nodes[j].glow);
+          ctx.strokeStyle = `rgba(100,200,110,${(1 - d / MAX_D) * (0.1 + g * 0.3)})`;
+          ctx.lineWidth   = 0.5 + g * 1.2;
+          ctx.beginPath();
+          ctx.moveTo(nodes[i].x, nodes[i].y);
+          ctx.lineTo(nodes[j].x, nodes[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // pulses
+    this.nnPulses = this.nnPulses.filter(p => p.t < 1);
+    for (const p of this.nnPulses) {
+      p.t = Math.min(1, p.t + p.speed);
+      const a = nodes[p.from], b = nodes[p.to];
+      if (!a || !b) continue;
+      const px = a.x + (b.x - a.x) * p.t;
+      const py = a.y + (b.y - a.y) * p.t;
+      const alpha = Math.sin(p.t * Math.PI);
+      // glow halo
+      ctx.beginPath();
+      ctx.arc(px, py, 7, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(120,230,130,${alpha * 0.12})`;
+      ctx.fill();
+      // bright core
+      ctx.beginPath();
+      ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(180,255,190,${alpha * 0.95})`;
+      ctx.fill();
+      if (p.t > 0.85) b.glow = Math.min(1, b.glow + 0.45);
+    }
+
+    // idle random pulse
+    if (Math.random() < 0.04) this.nnFire();
+
+    // nodes
+    for (const n of nodes) {
+      const r = 1.8 + n.glow * 2.5;
+      if (n.glow > 0.15) {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, r * 4, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(100,200,110,${n.glow * 0.07})`;
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(100,200,110,${0.3 + n.glow * 0.6})`;
+      ctx.fill();
+    }
+
+    this.nnFrame = requestAnimationFrame(this.nnLoop);
+  };
+
+  private nnFire(fromIdx?: number) {
+    const nodes = this.nnNodes;
+    if (nodes.length < 2) return;
+    const from = fromIdx ?? Math.floor(Math.random() * nodes.length);
+    const near = nodes
+      .map((n, i) => ({ i, d: Math.hypot(n.x - nodes[from].x, n.y - nodes[from].y) }))
+      .filter(c => c.i !== from && c.d < 140)
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 4);
+    if (!near.length) return;
+    const to = near[Math.floor(Math.random() * near.length)].i;
+    this.nnPulses.push({ from, to, t: 0, speed: 0.011 + Math.random() * 0.009 });
+  }
+
+  private nnWave() {
+    for (let i = 0; i < 12; i++) {
+      setTimeout(() => {
+        const from = Math.floor(Math.random() * this.nnNodes.length);
+        this.nnNodes[from].glow = 1;
+        this.nnFire(from);
+        this.nnFire(from);
+        this.nnFire(from);
+      }, i * 60);
+    }
   }
 
   // ── Rendering ─────────────────────────────────────────────────────────────────
