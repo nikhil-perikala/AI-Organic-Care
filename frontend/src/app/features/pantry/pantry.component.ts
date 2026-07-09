@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy, ViewChild, ElementRef, NgZone } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
@@ -104,6 +104,20 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
   ],
   template: `
 <div class="pantry-page">
+
+  <!-- ══ 3D Galaxy Overlay ════════════════════════════════════ -->
+  @if (galaxyMode()) {
+    <div class="galaxy-overlay">
+      <canvas class="galaxy-canvas" #galaxyCanvas
+        (mousedown)="gxMouseDown($event)" (mousemove)="gxMouseMove($event)"
+        (mouseup)="gxMouseUp()" (mouseleave)="gxMouseUp()"
+        (touchstart)="gxTouchStart($event)" (touchmove)="gxTouchMove($event)"
+        (touchend)="gxMouseUp()" (click)="gxClick($event)">
+      </canvas>
+      <button class="galaxy-close" (click)="toggleGalaxy()">✕</button>
+      <div class="galaxy-hint">Drag to rotate · tap an orb to inspect</div>
+    </div>
+  }
 
   <!-- ══ Page Header ══════════════════════════════════════════ -->
   <div class="card border-0 shadow-sm mb-3" style="border-radius:16px">
@@ -351,12 +365,16 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
               </div>
               <div class="btn-group btn-group-sm">
                 <button class="btn" [class.btn-success]="viewMode==='table'" [class.btn-outline-secondary]="viewMode!=='table'"
-                  (click)="viewMode='table'">
+                  (click)="viewMode='table'; galaxyMode.set(false)">
                   <mat-icon style="font-size:16px;line-height:1;vertical-align:middle">table_rows</mat-icon>
                 </button>
                 <button class="btn" [class.btn-success]="viewMode==='grid'" [class.btn-outline-secondary]="viewMode!=='grid'"
-                  (click)="viewMode='grid'">
+                  (click)="viewMode='grid'; galaxyMode.set(false)">
                   <mat-icon style="font-size:16px;line-height:1;vertical-align:middle">grid_view</mat-icon>
+                </button>
+                <button class="btn" [class.btn-success]="galaxyMode()" [class.btn-outline-secondary]="!galaxyMode()"
+                  (click)="toggleGalaxy()" title="3D Galaxy View">
+                  🌌
                 </button>
               </div>
             </div>
@@ -839,6 +857,31 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
 }
   `,
   styles: [`
+    /* ── Galaxy overlay ── */
+    .galaxy-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      background: #020b03;
+      display: flex; align-items: stretch; justify-content: center;
+    }
+    .galaxy-canvas {
+      width: 100%; height: 100%;
+      display: block; cursor: grab;
+    }
+    .galaxy-canvas:active { cursor: grabbing; }
+    .galaxy-close {
+      position: absolute; top: 16px; right: 16px;
+      background: rgba(30,60,30,0.8); border: 1px solid #4caf50;
+      color: #a5d6a7; font-size: 18px; width: 36px; height: 36px;
+      border-radius: 50%; cursor: pointer; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .galaxy-hint {
+      position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.55); color: rgba(200,230,200,0.7);
+      font-size: 12px; padding: 6px 16px; border-radius: 20px;
+      pointer-events: none;
+    }
+
     .pantry-page { padding: 20px 16px 80px; background: #f7f9f7; min-height: 100vh; }
 
     @media (min-width: 768px) {
@@ -1303,7 +1346,7 @@ export class PantryComponent implements OnInit, OnDestroy {
     ).subscribe(results => { this.foodResults.set(results); this.searching.set(false); });
   }
 
-  ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
+  ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); cancelAnimationFrame(this.gxFrame); }
 
   private localSuggestions(q: string): UsdaFood[] {
     const ql = q.toLowerCase();
@@ -1488,6 +1531,222 @@ export class PantryComponent implements OnInit, OnDestroy {
       'Sweeteners': '#fff8e1',   'Adaptogens': '#e8f5e9',
     };
     return MAP[cat ?? ''] ?? '#f5f5f5';
+  }
+
+  // ── 3D Galaxy ─────────────────────────────────────────────────────────────
+
+  private zone = inject(NgZone);
+  @ViewChild('galaxyCanvas') private galaxyCanvasRef?: ElementRef<HTMLCanvasElement>;
+
+  galaxyMode = signal(false);
+  private gxFrame = 0;
+  private gxRotX  = 0.25;
+  private gxRotY  = 0;
+  private gxDragging = false;
+  private gxLastX    = 0;
+  private gxLastY    = 0;
+  private gxVelX     = 0;
+  private gxVelY     = 0.004;
+
+  toggleGalaxy() {
+    const next = !this.galaxyMode();
+    this.galaxyMode.set(next);
+    if (next) {
+      setTimeout(() => this.zone.runOutsideAngular(() => this.gxInit()), 0);
+    } else {
+      cancelAnimationFrame(this.gxFrame);
+    }
+  }
+
+  private gxInit() {
+    const canvas = this.galaxyCanvasRef?.nativeElement;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+
+    const resize = () => {
+      canvas.width  = canvas.offsetWidth  || window.innerWidth;
+      canvas.height = canvas.offsetHeight || window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const items = this.items();
+    const N = items.length;
+    if (N === 0) return;
+
+    // Fibonacci sphere distribution
+    const phi = Math.PI * (3 - Math.sqrt(5));
+    const R = Math.min(canvas.width, canvas.height) * 0.32;
+    interface Orb { x0: number; y0: number; z0: number; item: PantryItem; color: string; glow: string; r: number; }
+
+    const catColors: Record<string, string> = {
+      'Leafy Greens':'#66bb6a','Vegetables':'#8bc34a','Fruits':'#ffa726',
+      'Berries':'#ec407a','Nuts & Seeds':'#ff8f00','Grains':'#bdbdbd',
+      'Legumes':'#aed581','Fish & Seafood':'#29b6f6','Meat & Poultry':'#ef5350',
+      'Dairy':'#ce93d8','Herbs & Spices':'#80cbc4','Oils':'#ffe082',
+      'Sweeteners':'#fff176','Adaptogens':'#a5d6a7',
+    };
+
+    const orbs: Orb[] = items.map((item, i) => {
+      const y  = 1 - (i / (N - 1 || 1)) * 2;
+      const r  = Math.sqrt(Math.max(0, 1 - y * y));
+      const th = phi * i;
+      const st = statusOf(item);
+      const color = catColors[item.category ?? ''] ?? '#81c784';
+      const glow  = st === 'expired' ? '#ef5350' : st === 'expiring' ? '#ffa726' : '#66bb6a';
+      return { x0: Math.cos(th) * r * R, y0: y * R, z0: Math.sin(th) * r * R, item, color, glow, r: 14 + Math.random() * 6 };
+    });
+
+    const loop = () => {
+      if (!this.galaxyMode()) { window.removeEventListener('resize', resize); return; }
+
+      if (!this.gxDragging) {
+        this.gxRotY += this.gxVelY;
+        this.gxRotX += this.gxVelX;
+        this.gxVelX *= 0.97;
+        this.gxVelY = this.gxVelY * 0.998 + 0.004 * 0.002;
+      }
+
+      const sinX = Math.sin(this.gxRotX), cosX = Math.cos(this.gxRotX);
+      const sinY = Math.sin(this.gxRotY), cosY = Math.cos(this.gxRotY);
+      const W = canvas.width, H = canvas.height;
+      const CX = W / 2, CY = H / 2;
+      const FOV = 600;
+
+      ctx.clearRect(0, 0, W, H);
+
+      // Space background
+      ctx.fillStyle = '#020b03';
+      ctx.fillRect(0, 0, W, H);
+
+      // Star field (static cheap hack: fixed seed points)
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      for (let s = 0; s < 200; s++) {
+        const sx = (Math.sin(s * 127.1) * 0.5 + 0.5) * W;
+        const sy = (Math.sin(s * 311.7) * 0.5 + 0.5) * H;
+        ctx.fillRect(sx, sy, 1, 1);
+      }
+
+      // Project and sort orbs
+      type Proj = { px: number; py: number; pz: number; orb: Orb; };
+      const projected: Proj[] = orbs.map(orb => {
+        // Rotate Y
+        const x1 = orb.x0 * cosY - orb.z0 * sinY;
+        const z1 = orb.x0 * sinY + orb.z0 * cosY;
+        // Rotate X
+        const y2 = orb.y0 * cosX - z1 * sinX;
+        const z2 = orb.y0 * sinX + z1 * cosX;
+        const pz = z2 + FOV;
+        const scale = FOV / pz;
+        return { px: CX + x1 * scale, py: CY + y2 * scale, pz: z2, orb };
+      });
+
+      projected.sort((a, b) => a.pz - b.pz);
+
+      // Draw orbs
+      for (const { px, py, pz, orb } of projected) {
+        const scale = FOV / (pz + FOV);
+        const rad = orb.r * scale;
+        if (rad < 2) continue;
+
+        // Depth-based dimming
+        const depth = (pz + R) / (2 * R);
+        const alpha = 0.3 + 0.7 * Math.max(0, 1 - Math.max(0, depth));
+
+        // Orb glow
+        const glowR = ctx.createRadialGradient(px - rad * 0.3, py - rad * 0.3, 0, px, py, rad * 2.5);
+        glowR.addColorStop(0, orb.glow + '44');
+        glowR.addColorStop(1, 'transparent');
+        ctx.beginPath();
+        ctx.arc(px, py, rad * 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = glowR;
+        ctx.globalAlpha = alpha * 0.6;
+        ctx.fill();
+
+        // Orb body
+        const grad = ctx.createRadialGradient(px - rad * 0.35, py - rad * 0.35, 0, px, py, rad);
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.25, orb.color);
+        grad.addColorStop(1, orb.color + '88');
+        ctx.beginPath();
+        ctx.arc(px, py, rad, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.globalAlpha = alpha;
+        ctx.fill();
+
+        // Label for near orbs
+        if (pz > -R * 0.3 && rad > 6) {
+          ctx.globalAlpha = alpha * Math.min(1, (rad - 6) / 10);
+          ctx.font = `bold ${Math.round(10 * scale + 8)}px "Segoe UI", sans-serif`;
+          ctx.fillStyle = '#e8f5e9';
+          ctx.textAlign = 'center';
+          ctx.shadowColor = '#000';
+          ctx.shadowBlur = 4;
+          ctx.fillText(orb.item.ingredient_name, px, py + rad + 13 * scale);
+          ctx.shadowBlur = 0;
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      // Store projected for click detection
+      (canvas as any).__gxProjected = projected;
+      this.gxFrame = requestAnimationFrame(loop);
+    };
+
+    this.gxFrame = requestAnimationFrame(loop);
+  }
+
+  gxMouseDown(e: MouseEvent) { this.gxDragging = true; this.gxLastX = e.clientX; this.gxLastY = e.clientY; }
+  gxMouseMove(e: MouseEvent) {
+    if (!this.gxDragging) return;
+    const dx = e.clientX - this.gxLastX;
+    const dy = e.clientY - this.gxLastY;
+    this.gxVelY = dx * 0.005;
+    this.gxVelX = dy * 0.005;
+    this.gxRotY += this.gxVelY;
+    this.gxRotX += this.gxVelX;
+    this.gxLastX = e.clientX;
+    this.gxLastY = e.clientY;
+  }
+  gxMouseUp() { this.gxDragging = false; }
+
+  gxTouchStart(e: TouchEvent) {
+    e.preventDefault();
+    this.gxDragging = true;
+    this.gxLastX = e.touches[0].clientX;
+    this.gxLastY = e.touches[0].clientY;
+  }
+  gxTouchMove(e: TouchEvent) {
+    e.preventDefault();
+    if (!this.gxDragging) return;
+    const dx = e.touches[0].clientX - this.gxLastX;
+    const dy = e.touches[0].clientY - this.gxLastY;
+    this.gxVelY = dx * 0.005;
+    this.gxVelX = dy * 0.005;
+    this.gxRotY += this.gxVelY;
+    this.gxRotX += this.gxVelX;
+    this.gxLastX = e.touches[0].clientX;
+    this.gxLastY = e.touches[0].clientY;
+  }
+
+  gxClick(e: MouseEvent) {
+    const canvas = this.galaxyCanvasRef?.nativeElement;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const projected: { px: number; py: number; pz: number; orb: { r: number; item: PantryItem } }[] = (canvas as any).__gxProjected ?? [];
+    // Find closest orb within its radius
+    for (const p of [...projected].reverse()) {
+      const dx = mx - p.px, dy = my - p.py;
+      const FOV = 600;
+      const scale = FOV / (p.pz + FOV);
+      const hitR = p.orb.r * scale + 6;
+      if (dx * dx + dy * dy <= hitR * hitR) {
+        this.zone.run(() => this.openDetail(p.orb.item));
+        return;
+      }
+    }
   }
 
   // ── Insight shortcuts ──────────────────────────────────────────────────────
