@@ -1,4 +1,4 @@
-﻿import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -16,7 +16,6 @@ interface ModeCard   { key: string; emoji: string; title: string; subtitle: stri
 interface RecipeCard { id: string; title: string; emoji: string; cardBg: string; matchPct: number; matchBg: string; time: string; difficulty: string; chip: string; chipBg: string; imageUrl: string; }
 interface RecipeIngredientDetail { ingredient: { id: string; name: string; category: string | null }; quantity: string | null; unit: string | null; notes: string | null; is_optional: boolean; }
 interface RecipeDetail { id: string; title: string; description: string | null; instructions: string | null; prep_time_minutes: number | null; cook_time_minutes: number | null; servings: number; cuisine_type: string | null; meal_type: string | null; ailment_tags: string[]; health_benefits: string[]; dietary_labels: string[]; efficacy_score: number; recipe_ingredients: RecipeIngredientDetail[]; }
-interface DailyTip { title: string; tip: string; icon: string; }
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const HERO_SLIDES: HeroSlide[] = [
@@ -55,9 +54,9 @@ const MOODS: MoodOption[] = [
 ];
 
 const MODE_CARDS: ModeCard[] = [
-  { key: 'meals',      emoji: 'restaurant_menu', title: 'Recipes',      subtitle: 'Browse organic recipes',     color: '#2e7d32', btnBg: '#2e7d32', imgBg: 'linear-gradient(135deg,#e8f5e9,#a5d6a7)', imageUrl: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=400&auto=format&fit=crop&q=80' },
-  { key: 'favourites', emoji: 'favorite',        title: 'Favorites',    subtitle: 'Your saved recipes',         color: '#c62828', btnBg: '#c62828', imgBg: 'linear-gradient(135deg,#fce4ec,#ef9a9a)', imageUrl: 'https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?w=400&auto=format&fit=crop&q=80' },
-  { key: 'plan',       emoji: 'calendar_month',  title: 'Meal Planner', subtitle: 'Plan your week',             color: '#6a1b9a', btnBg: '#6a1b9a', imgBg: 'linear-gradient(135deg,#f3e5f5,#ce93d8)', imageUrl: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&auto=format&fit=crop&q=80' },
+  { key: 'pantry-manage', emoji: 'kitchen',        title: 'My Pantry',    subtitle: 'View & manage your ingredients',     color: '#2e7d32', btnBg: '#2e7d32', imgBg: 'linear-gradient(135deg,#e8f5e9,#a5d6a7)', imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&auto=format&fit=crop&q=80' },
+  { key: 'tobuy',         emoji: 'shopping_cart',  title: 'Shopping List', subtitle: 'Build & discover what to buy next', color: '#1565c0', btnBg: '#1565c0', imgBg: 'linear-gradient(135deg,#e3f2fd,#90caf9)', imageUrl: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=400&auto=format&fit=crop&q=80' },
+  { key: 'plan',          emoji: 'calendar_month', title: 'Meal Planner',  subtitle: 'Plan your week intelligently',       color: '#6a1b9a', btnBg: '#6a1b9a', imgBg: 'linear-gradient(135deg,#f3e5f5,#ce93d8)', imageUrl: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&auto=format&fit=crop&q=80' },
 ];
 
 const MEAL_ICON: Record<string, string> = { breakfast: 'free_breakfast', lunch: 'lunch_dining', dinner: 'dinner_dining', beverage: 'local_cafe', snack: 'apple' };
@@ -106,28 +105,28 @@ function recipeToCard(r: ApiRecipe): RecipeCard {
   };
 }
 
-const DAILY_TIPS: DailyTip[] = [
-  { title: 'Warm Lemon Water',     icon: 'water_drop',       tip: 'Start your day with warm lemon water for a gentle liver detox and digestion boost.' },
-  { title: 'Eat the Rainbow',      icon: 'palette',          tip: 'Eating colorful vegetables daily provides a range of antioxidants and phytonutrients.' },
-  { title: 'Turmeric Power',       icon: 'science',          tip: 'Turmeric and black pepper together enhance curcumin absorption by up to 2000%.' },
-  { title: 'Feed Your Gut',        icon: 'bubble_chart',     tip: 'Fermented foods like yogurt and kimchi support a healthy gut microbiome.' },
-  { title: 'Omega-3 Benefits',     icon: 'favorite',         tip: 'Omega-3 fatty acids from walnuts and flaxseeds help reduce systemic inflammation.' },
-  { title: 'Sleep & Metabolism',   icon: 'bedtime',          tip: 'Aim for 7–9 hours of sleep — it directly regulates hunger hormones and metabolism.' },
-  { title: 'Chew Mindfully',       icon: 'sentiment_satisfied', tip: 'Mindful eating — chewing slowly and thoroughly — dramatically improves digestion.' },
-  { title: 'Ginger Before Meals',  icon: 'local_cafe',       tip: 'Ginger tea before meals supports digestion and helps reduce bloating.' },
-  { title: 'Leafy Greens Daily',   icon: 'eco',              tip: 'Dark leafy greens like spinach and kale are among the most nutrient-dense foods you can eat.' },
-  { title: 'Hydration Matters',    icon: 'opacity',          tip: 'Staying hydrated (8+ glasses of water daily) keeps energy stable throughout the day.' },
-  { title: 'Plant Protein Power',  icon: 'grass',            tip: 'Legumes are excellent plant-based protein sources rich in fiber, iron, and folate.' },
-  { title: 'Adapt to Stress',      icon: 'self_improvement', tip: 'Ashwagandha is an adaptogen that helps your body manage stress more effectively.' },
-  { title: 'Avocado for Heart',    icon: 'monitor_heart',    tip: 'Avocado is rich in monounsaturated fats and potassium that actively support heart health.' },
-  { title: 'Berries for Brain',    icon: 'psychology',       tip: 'Berries are low in sugar and packed with antioxidants that protect long-term brain health.' },
-  { title: 'Protein Breakfast',    icon: 'breakfast_dining', tip: 'A protein-rich breakfast reduces afternoon cravings and keeps blood sugar stable all day.' },
-  { title: 'Raw Garlic Power',     icon: 'medical_services', tip: 'Raw garlic contains allicin, a powerful antimicrobial and immune-boosting compound.' },
-  { title: 'Chia Seed Hydration',  icon: 'grain',            tip: 'Chia seeds absorb water and expand in your stomach, promoting fullness and hydration.' },
-  { title: 'Green Tea Calm',       icon: 'local_cafe',       tip: 'Green tea contains L-theanine which promotes calm alertness without the coffee jitters.' },
+const DAILY_TIPS: string[] = [
+  'Start your day with warm lemon water for a gentle liver detox and digestion boost.',
+  'Eating colorful vegetables daily provides a range of antioxidants and phytonutrients.',
+  'Turmeric and black pepper together enhance curcumin absorption by up to 2000%.',
+  'Fermented foods like yogurt and kimchi support a healthy gut microbiome.',
+  'Omega-3 fatty acids from walnuts and flaxseeds help reduce systemic inflammation.',
+  'Aim for 7–9 hours of sleep — it directly regulates hunger hormones and metabolism.',
+  'Mindful eating — chewing slowly and thoroughly — dramatically improves digestion.',
+  'Ginger tea before meals supports digestion and helps reduce bloating.',
+  'Dark leafy greens like spinach and kale are among the most nutrient-dense foods you can eat.',
+  'Staying hydrated (8+ glasses of water daily) keeps energy stable throughout the day.',
+  'Legumes are excellent plant-based protein sources rich in fiber, iron, and folate.',
+  'Ashwagandha is an adaptogen that helps your body manage stress more effectively.',
+  'Avocado is rich in monounsaturated fats and potassium that actively support heart health.',
+  'Berries are low in sugar and packed with antioxidants that protect long-term brain health.',
+  'A protein-rich breakfast reduces afternoon cravings and keeps blood sugar stable all day.',
+  'Raw garlic contains allicin, a powerful antimicrobial and immune-boosting compound.',
+  'Chia seeds absorb water and expand in your stomach, promoting fullness and hydration.',
+  'Green tea contains L-theanine which promotes calm alertness without the coffee jitters.',
 ];
 
-function getDailyTip(): DailyTip {
+function getDailyTip(): string {
   const start = new Date(new Date().getFullYear(), 0, 0);
   const dayOfYear = Math.floor((Date.now() - start.getTime()) / 86_400_000);
   return DAILY_TIPS[dayOfYear % DAILY_TIPS.length];
@@ -149,53 +148,18 @@ function getGreeting(): string {
   template: `
 <div class="home-page">
 
-  <!-- ── Welcome Hero ─────────────────────────────────────── -->
-  <div class="welcome-hero">
-    <div class="welcome-deco-1"></div>
-    <div class="welcome-deco-2"></div>
-
-    <div class="welcome-badge-row">
-      <span class="welcome-badge">🌿 Organic Care AI</span>
-    </div>
-
-    <h1 class="welcome-title">{{ greeting }},<br>{{ userName }}!</h1>
-    <p class="welcome-sub">Your personalised AI wellness companion</p>
-
-    @if (auth.isLoggedIn()) {
-      <div class="welcome-stats" (click)="goToPantry()">
-        <div class="welcome-stat">
-          <div class="welcome-stat-num">{{ pantryCount() }}</div>
-          <div class="welcome-stat-lbl">Pantry Items</div>
-        </div>
-        <div class="welcome-stat-sep"></div>
-        <div class="welcome-stat">
-          <div class="welcome-stat-num" [class.welcome-stat-warn]="expiringCount() > 0">{{ expiringCount() }}</div>
-          <div class="welcome-stat-lbl">Expiring Soon</div>
-        </div>
-        <div class="welcome-stat-sep"></div>
-        <div class="welcome-stat">
-          <div class="welcome-stat-num">AI</div>
-          <div class="welcome-stat-lbl">Ready ✓</div>
-        </div>
+  <!-- ── S1: Greeting banner ─────────────────────────────── -->
+  <div class="greeting-banner px-4 py-3">
+    <div class="d-flex align-items-center gap-3">
+      <div class="health-logo flex-shrink-0">
+        <mat-icon style="font-size:24px;color:#2e7d32">eco</mat-icon>
       </div>
-    }
-
-    <div class="welcome-actions">
-      <button class="welcome-btn-primary" (click)="goToChat()">
-        <mat-icon>smart_toy</mat-icon> Ask AI
-      </button>
-      <button class="welcome-btn-ghost" (click)="goMode('meals')">
-        <mat-icon>restaurant_menu</mat-icon> Recipes
-      </button>
-      @if (auth.isLoggedIn()) {
-        <button class="welcome-btn-ghost" (click)="goToPantry()">
-          <mat-icon>kitchen</mat-icon> Pantry
-        </button>
-      } @else {
-        <button class="welcome-btn-ghost" (click)="goMode('chat')">
-          <mat-icon>login</mat-icon> Sign In
-        </button>
-      }
+      <div>
+        <h1 class="fw-bold text-white mb-0" style="font-size:clamp(16px,4vw,22px);line-height:1.2">
+          {{ greeting }}, {{ userName }} 👋
+        </h1>
+        <p class="mb-0 small" style="color:rgba(255,255,255,0.65)">Eat Organic, Live Healthy</p>
+      </div>
     </div>
   </div>
 
@@ -222,26 +186,6 @@ function getGreeting(): string {
         <button class="hero-dot" [class.hero-dot-active]="currentHeroSlide() === $index"
           (click)="$event.stopPropagation(); setHeroSlide($index)"></button>
       }
-    </div>
-  </div>
-
-  <!-- ── S2: Today's Organic Tip ──────────────────────────── -->
-  <div class="px-3 px-md-4 mt-3">
-    <div class="tip-banner">
-      <div class="d-flex align-items-start gap-3">
-        <div class="tip-banner-icon flex-shrink-0">
-          <mat-icon>{{ todayTip.icon }}</mat-icon>
-        </div>
-        <div class="flex-fill">
-          <div class="tip-banner-label">Today's Organic Tip</div>
-          <div class="tip-banner-title">{{ todayTip.title }}</div>
-          <p class="tip-banner-text mb-2">{{ todayTip.tip }}</p>
-          <button class="tip-banner-cta" (click)="goToChat()">
-            <mat-icon style="font-size:13px;width:13px;height:13px;vertical-align:middle">smart_toy</mat-icon>
-            Ask AI for more
-          </button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -283,6 +227,10 @@ function getGreeting(): string {
             <h2 class="section-title mb-1">How are you feeling today?</h2>
             <p class="text-muted mb-0" style="font-size:12px">Your mood helps us personalize your recommendations.</p>
           </div>
+          <button class="btn btn-outline-success btn-sm d-flex align-items-center gap-1 flex-shrink-0 ms-3"
+            style="border-radius:20px;font-size:12px;padding:5px 12px" (click)="goMoodSuggestions()">
+            <mat-icon style="font-size:13px;width:13px;height:13px">edit</mat-icon> Update Mood
+          </button>
         </div>
         <div class="d-flex gap-2 mt-3 overflow-x-auto pb-1" style="scrollbar-width:none">
           @for (mood of moods; track mood.key) {
@@ -320,11 +268,10 @@ function getGreeting(): string {
   <div class="px-3 px-md-4 mt-4">
     <div class="d-flex align-items-center justify-content-between mb-1">
       <h2 class="section-title mb-0 d-flex align-items-center gap-2">
-        {{ auth.isLoggedIn() ? 'Best Recipes From Your Pantry' : 'Featured Organic Recipes' }}
+        {{ auth.isLoggedIn() ? 'Best Recipes From Your Pantry' : 'Recommended for You' }}
         <mat-icon style="font-size:16px;width:16px;height:16px;color:#4caf50">eco</mat-icon>
       </h2>
-      <a class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold d-flex align-items-center gap-1" style="color:#2e7d32"
-        [routerLink]="auth.isLoggedIn() ? '/recommendations' : '/meals'">
+      <a class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold d-flex align-items-center gap-1" style="color:#2e7d32" routerLink="/recommendations">
         View All <mat-icon style="font-size:16px;width:16px;height:16px">chevron_right</mat-icon>
       </a>
     </div>
@@ -343,7 +290,7 @@ function getGreeting(): string {
         }
       </div>
     } @else if (auth.isLoggedIn() && recipeCards().length === 0) {
-      @if (pantryCount() === 0) {
+      @if (pantryCount === 0) {
         <div class="card border-0 shadow-sm text-center py-5 px-3" style="border-radius:14px;background:#f8fdf8">
           <mat-icon style="font-size:48px;width:48px;height:48px;color:#a5d6a7;margin:0 auto">kitchen</mat-icon>
           <div class="fw-bold mt-3" style="color:#2e7d32;font-size:16px">Your pantry is empty</div>
@@ -452,7 +399,7 @@ function getGreeting(): string {
             </div>
             <div class="d-flex flex-column gap-1 mb-3">
               <div class="d-flex align-items-center gap-2">
-                <span class="fw-bold" style="font-size:22px;color:#2e7d32">{{ pantryCount() }}</span>
+                <span class="fw-bold" style="font-size:22px;color:#2e7d32">{{ pantryCount }}</span>
                 <span class="text-muted" style="font-size:11px">items tracked</span>
               </div>
 
@@ -485,7 +432,7 @@ function getGreeting(): string {
               </div>
               <span class="fw-bold" style="font-size:13px;color:#1a2a1a">Today's Tip</span>
             </div>
-            <p style="font-size:12px;color:#4a3a1a;line-height:1.55;margin-bottom:0.75rem">{{ todayTip.tip }}</p>
+            <p style="font-size:12px;color:#4a3a1a;line-height:1.55;margin-bottom:0.75rem">{{ todayTip }}</p>
             <button class="btn btn-sm fw-semibold d-flex align-items-center gap-1"
               style="border:1.5px solid #f57c00;color:#f57c00;border-radius:22px;font-size:12px;background:transparent;padding:6px 14px"
               (click)="goToChat()">
@@ -608,85 +555,15 @@ function getGreeting(): string {
   `,
   styles: [`
     .home-page { padding-bottom: 88px; }
+
     .section-title { font-size: 16px; font-weight: 700; color: #1a2a1a; }
 
-    /* ── Welcome Hero ── */
-    .welcome-hero {
-      position: relative; overflow: hidden;
-      background: linear-gradient(150deg, #145a1f 0%, #2e7d32 40%, #388e3c 70%, #4caf50 100%);
-      padding: 36px 20px 44px;
-      animation: wFadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both;
-    }
-    @keyframes wFadeUp {
-      from { opacity: 0; transform: translateY(14px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    .welcome-deco-1 {
-      position: absolute; top: -90px; right: -70px;
-      width: 280px; height: 280px; border-radius: 50%;
-      background: rgba(255,255,255,0.07); pointer-events: none;
-    }
-    .welcome-deco-2 {
-      position: absolute; bottom: -60px; left: 15%;
-      width: 200px; height: 200px; border-radius: 50%;
-      background: rgba(255,255,255,0.04); pointer-events: none;
-    }
-    .welcome-badge-row { margin-bottom: 18px; }
-    .welcome-badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      background: rgba(255,255,255,0.15);
-      border: 1px solid rgba(255,255,255,0.22);
-      border-radius: 100px; padding: 5px 14px;
-      font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.9);
-    }
-    .welcome-title {
-      font-size: clamp(28px,8vw,44px); font-weight: 800;
-      color: #fff; line-height: 1.1; letter-spacing: -0.5px; margin: 0 0 8px;
-    }
-    .welcome-sub {
-      color: rgba(255,255,255,0.62); font-size: 14px; margin: 0 0 24px;
-    }
-    .welcome-stats {
-      display: flex; align-items: center;
-      background: rgba(0,0,0,0.2); border-radius: 14px;
-      padding: 14px 20px; margin-bottom: 22px;
-      max-width: 360px; cursor: pointer;
-    }
-    .welcome-stat { flex: 1; text-align: center; }
-    .welcome-stat-num {
-      font-size: 26px; font-weight: 800; color: #fff; line-height: 1;
-    }
-    .welcome-stat-num.welcome-stat-warn { color: #ffcc80; }
-    .welcome-stat-lbl {
-      font-size: 10px; color: rgba(255,255,255,0.52);
-      text-transform: uppercase; letter-spacing: 0.8px; margin-top: 3px;
-    }
-    .welcome-stat-sep {
-      width: 1px; height: 38px; background: rgba(255,255,255,0.14); margin: 0 8px;
-    }
-    .welcome-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-    .welcome-btn-primary, .welcome-btn-ghost {
-      display: inline-flex; align-items: center; gap: 7px;
-      padding: 11px 20px; border-radius: 100px;
-      font-size: 13px; font-weight: 600; border: none; cursor: pointer;
-      transition: transform 0.15s, box-shadow 0.15s;
-    }
-    .welcome-btn-primary:active, .welcome-btn-ghost:active { transform: scale(0.96); }
-    .welcome-btn-primary {
-      background: #fff; color: #1b5e20;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.22);
-    }
-    .welcome-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.28); }
-    .welcome-btn-ghost {
-      background: rgba(255,255,255,0.14); color: #fff;
-      border: 1.5px solid rgba(255,255,255,0.25);
-    }
-    .welcome-btn-ghost:hover { background: rgba(255,255,255,0.22); }
-    .welcome-btn-primary mat-icon, .welcome-btn-ghost mat-icon {
-      font-size: 17px; width: 17px; height: 17px;
+    /* Greeting */
+    .greeting-banner {
+      background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 60%, #43a047 100%);
     }
     @media (min-width: 768px) {
-      .welcome-hero { border-radius: 0 0 28px 28px; padding: 52px 44px 60px; }
+      .greeting-banner { border-radius: 0 0 20px 20px; }
       .home-page { padding-bottom: 40px; max-width: 1100px; margin: 0 auto; }
     }
 
@@ -737,33 +614,6 @@ function getGreeting(): string {
       padding: 8px 10px; border-radius: 8px;
       font-size: 12px; color: #1a2a1a; line-height: 1.4;
     }
-
-    /* Today's Organic Tip banner */
-    .tip-banner {
-      background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 55%, #43a047 100%);
-      border-radius: 16px;
-      padding: 16px 18px;
-    }
-    .tip-banner-icon {
-      width: 44px; height: 44px; border-radius: 12px;
-      background: rgba(255,255,255,0.18);
-      display: flex; align-items: center; justify-content: center;
-    }
-    .tip-banner-icon mat-icon { color: #fff; font-size: 22px; width: 22px; height: 22px; }
-    .tip-banner-label {
-      font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.65);
-      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;
-    }
-    .tip-banner-title { font-size: 14px; font-weight: 800; color: #fff; margin-bottom: 5px; }
-    .tip-banner-text  { font-size: 12px; color: rgba(255,255,255,0.85); line-height: 1.55; }
-    .tip-banner-cta {
-      display: inline-flex; align-items: center; gap: 5px;
-      background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.35);
-      color: #fff; border-radius: 20px; padding: 5px 14px;
-      font-size: 11px; font-weight: 600; cursor: pointer;
-      transition: background 0.15s;
-    }
-    .tip-banner-cta:hover { background: rgba(255,255,255,0.3); }
 
     /* Mode card */
     .mode-card { transition: transform 0.15s, box-shadow 0.15s; }
@@ -948,9 +798,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   recipeModalOpen     = signal(false);
   recipeDetailLoading = signal(false);
 
-  recipeCount   = 0;
-  pantryCount   = signal(0);
-  expiringCount = signal(0);
+  recipeCount = 0;
+  pantryCount = 0;
 
   favouriteIds   = this.favSvc.favouriteIds;
   favouriteCards = computed(() => this.favSvc.favouriteRecipes().map(r => recipeToCard(r)));
@@ -1015,18 +864,9 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   private loadPantry() {
-    this.http.get<{ expiry_date: string | null }[]>(`${environment.apiUrl}/pantry`)
+    this.http.get<unknown[]>(`${environment.apiUrl}/pantry`)
       .pipe(catchError(() => of([])))
-      .subscribe(items => {
-        this.pantryCount.set(items.length);
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        const expiring = items.filter(i => {
-          if (!i.expiry_date) return false;
-          const diff = Math.ceil((new Date(i.expiry_date + 'T00:00:00').getTime() - today.getTime()) / 86_400_000);
-          return diff >= 0 && diff <= 7;
-        });
-        this.expiringCount.set(expiring.length);
-      });
+      .subscribe(items => { this.pantryCount = items.length; });
   }
 
   toggleFavourite(event: Event, recipeId: string) {
@@ -1068,7 +908,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (mode === 'plan')           { this.router.navigate(['/meal-planner']); return; }
     if (mode === 'chat')           { this.router.navigate(['/chat']); return; }
     if (mode === 'meals')          { this.router.navigate(['/meals']); return; }
-    if (mode === 'favourites')     { this.goToFavourites(); return; }
     if (mode === 'pantry-manage')  { this.router.navigate(['/pantry']); return; }
     this.router.navigate(['/recommendations'], { queryParams: { mode } });
   }
