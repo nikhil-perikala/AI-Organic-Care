@@ -128,25 +128,6 @@ const DAILY_TIPS: DailyTip[] = [
   { title: 'Green Tea Calm',      icon: 'local_cafe',          tip: 'Green tea contains L-theanine which promotes calm alertness without the coffee jitters.' },
 ];
 
-const LEAF_CFG = [
-  { left: '4%',  delay: '0s',    dur: '9s'    },
-  { left: '13%', delay: '2.5s',  dur: '11s'   },
-  { left: '22%', delay: '0.8s',  dur: '8.5s'  },
-  { left: '31%', delay: '4s',    dur: '12s'   },
-  { left: '43%', delay: '1.5s',  dur: '9.5s'  },
-  { left: '54%', delay: '3.2s',  dur: '10s'   },
-  { left: '63%', delay: '0.4s',  dur: '8s'    },
-  { left: '72%', delay: '5s',    dur: '11.5s' },
-  { left: '81%', delay: '2s',    dur: '9s'    },
-  { left: '91%', delay: '3.7s',  dur: '10.5s' },
-  { left: '8%',  delay: '7s',    dur: '9s'    },
-  { left: '50%', delay: '6s',    dur: '8s'    },
-  { left: '37%', delay: '8s',    dur: '11s'   },
-  { left: '68%', delay: '4.5s',  dur: '10s'   },
-  { left: '17%', delay: '9s',    dur: '9.5s'  },
-  { left: '87%', delay: '1s',    dur: '12s'   },
-];
-
 function getDailyTip(): DailyTip {
   const start = new Date(new Date().getFullYear(), 0, 0);
   const dayOfYear = Math.floor((Date.now() - start.getTime()) / 86_400_000);
@@ -168,13 +149,6 @@ function getGreeting(): string {
   imports: [CommonModule, RouterLink, MatIconModule],
   template: `
 <div class="home-page">
-
-  <!-- Falling leaves background -->
-  <div class="leaves-bg" aria-hidden="true">
-    @for (l of leaves; track $index) {
-      <span class="leaf" [style.left]="l.left" [style.animation-delay]="l.delay" [style.animation-duration]="l.dur">🍃</span>
-    }
-  </div>
 
   <!-- ── S1: Greeting banner ─────────────────────────────── -->
   <div class="greeting-banner px-4 py-3">
@@ -602,16 +576,6 @@ function getGreeting(): string {
   styles: [`
     .home-page { padding-bottom: 88px; }
 
-    /* ── Falling leaves ─────────────────────────────────── */
-    .leaves-bg { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
-    .leaf { position: absolute; top: -40px; font-size: 17px; line-height: 1; opacity: 0; animation: leafFall linear infinite; }
-    @keyframes leafFall {
-      0%   { transform: translateY(-40px) rotate(0deg) translateX(0);       opacity: 0;    }
-      8%   { opacity: 0.55; }
-      88%  { opacity: 0.4;  }
-      100% { transform: translateY(110vh) rotate(600deg) translateX(35px);  opacity: 0;    }
-    }
-
     .section-title { font-size: 16px; font-weight: 700; color: #1a2a1a; }
 
     /* Greeting */
@@ -886,7 +850,6 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   activeMood = computed(() => this.moods.find(m => m.key === this.selectedMood()) ?? null);
   todayTip   = getDailyTip();
-  readonly leaves = LEAF_CFG;
 
   get userName(): string {
     const user = this.auth.currentUser();
