@@ -105,28 +105,30 @@ function recipeToCard(r: ApiRecipe): RecipeCard {
   };
 }
 
-const DAILY_TIPS: string[] = [
-  'Start your day with warm lemon water for a gentle liver detox and digestion boost.',
-  'Eating colorful vegetables daily provides a range of antioxidants and phytonutrients.',
-  'Turmeric and black pepper together enhance curcumin absorption by up to 2000%.',
-  'Fermented foods like yogurt and kimchi support a healthy gut microbiome.',
-  'Omega-3 fatty acids from walnuts and flaxseeds help reduce systemic inflammation.',
-  'Aim for 7–9 hours of sleep — it directly regulates hunger hormones and metabolism.',
-  'Mindful eating — chewing slowly and thoroughly — dramatically improves digestion.',
-  'Ginger tea before meals supports digestion and helps reduce bloating.',
-  'Dark leafy greens like spinach and kale are among the most nutrient-dense foods you can eat.',
-  'Staying hydrated (8+ glasses of water daily) keeps energy stable throughout the day.',
-  'Legumes are excellent plant-based protein sources rich in fiber, iron, and folate.',
-  'Ashwagandha is an adaptogen that helps your body manage stress more effectively.',
-  'Avocado is rich in monounsaturated fats and potassium that actively support heart health.',
-  'Berries are low in sugar and packed with antioxidants that protect long-term brain health.',
-  'A protein-rich breakfast reduces afternoon cravings and keeps blood sugar stable all day.',
-  'Raw garlic contains allicin, a powerful antimicrobial and immune-boosting compound.',
-  'Chia seeds absorb water and expand in your stomach, promoting fullness and hydration.',
-  'Green tea contains L-theanine which promotes calm alertness without the coffee jitters.',
+interface DailyTip { title: string; tip: string; icon: string; }
+
+const DAILY_TIPS: DailyTip[] = [
+  { title: 'Warm Lemon Water',    icon: 'water_drop',          tip: 'Start your day with warm lemon water for a gentle liver detox and digestion boost.' },
+  { title: 'Eat the Rainbow',     icon: 'palette',             tip: 'Eating colorful vegetables daily provides a range of antioxidants and phytonutrients.' },
+  { title: 'Turmeric Power',      icon: 'science',             tip: 'Turmeric and black pepper together enhance curcumin absorption by up to 2000%.' },
+  { title: 'Feed Your Gut',       icon: 'bubble_chart',        tip: 'Fermented foods like yogurt and kimchi support a healthy gut microbiome.' },
+  { title: 'Omega-3 Benefits',    icon: 'favorite',            tip: 'Omega-3 fatty acids from walnuts and flaxseeds help reduce systemic inflammation.' },
+  { title: 'Sleep & Metabolism',  icon: 'bedtime',             tip: 'Aim for 7–9 hours of sleep — it directly regulates hunger hormones and metabolism.' },
+  { title: 'Chew Mindfully',      icon: 'sentiment_satisfied', tip: 'Mindful eating — chewing slowly and thoroughly — dramatically improves digestion.' },
+  { title: 'Ginger Before Meals', icon: 'local_cafe',          tip: 'Ginger tea before meals supports digestion and helps reduce bloating.' },
+  { title: 'Leafy Greens Daily',  icon: 'eco',                 tip: 'Dark leafy greens like spinach and kale are among the most nutrient-dense foods you can eat.' },
+  { title: 'Hydration Matters',   icon: 'opacity',             tip: 'Staying hydrated (8+ glasses of water daily) keeps energy stable throughout the day.' },
+  { title: 'Plant Protein Power', icon: 'grass',               tip: 'Legumes are excellent plant-based protein sources rich in fiber, iron, and folate.' },
+  { title: 'Adapt to Stress',     icon: 'self_improvement',    tip: 'Ashwagandha is an adaptogen that helps your body manage stress more effectively.' },
+  { title: 'Avocado for Heart',   icon: 'monitor_heart',       tip: 'Avocado is rich in monounsaturated fats and potassium that actively support heart health.' },
+  { title: 'Berries for Brain',   icon: 'psychology',          tip: 'Berries are low in sugar and packed with antioxidants that protect long-term brain health.' },
+  { title: 'Protein Breakfast',   icon: 'breakfast_dining',    tip: 'A protein-rich breakfast reduces afternoon cravings and keeps blood sugar stable all day.' },
+  { title: 'Raw Garlic Power',    icon: 'medical_services',    tip: 'Raw garlic contains allicin, a powerful antimicrobial and immune-boosting compound.' },
+  { title: 'Chia Seed Hydration', icon: 'grain',               tip: 'Chia seeds absorb water and expand in your stomach, promoting fullness and hydration.' },
+  { title: 'Green Tea Calm',      icon: 'local_cafe',          tip: 'Green tea contains L-theanine which promotes calm alertness without the coffee jitters.' },
 ];
 
-function getDailyTip(): string {
+function getDailyTip(): DailyTip {
   const start = new Date(new Date().getFullYear(), 0, 0);
   const dayOfYear = Math.floor((Date.now() - start.getTime()) / 86_400_000);
   return DAILY_TIPS[dayOfYear % DAILY_TIPS.length];
@@ -163,16 +165,27 @@ function getGreeting(): string {
     </div>
   </div>
 
-  <!-- ── S1b: Daily Tip strip ─────────────────────────────── -->
-  <div class="mx-3 mx-md-4 mt-3">
-    <div class="d-flex align-items-center gap-2 px-3 py-2"
-      style="background:#fffbeb;border-radius:12px;border-left:3px solid #f57c00">
-      <mat-icon style="font-size:16px;width:16px;height:16px;color:#f57c00;flex-shrink:0">lightbulb</mat-icon>
-      <span style="font-size:12px;color:#4a3a1a;line-height:1.4"><strong>Today's Tip:</strong> {{ todayTip }}</span>
+  <!-- ── S2: Today's Organic Tip ──────────────────────────── -->
+  <div class="px-3 px-md-4 mt-3">
+    <div class="tip-banner">
+      <div class="d-flex align-items-start gap-3">
+        <div class="tip-banner-icon flex-shrink-0">
+          <mat-icon>{{ todayTip.icon }}</mat-icon>
+        </div>
+        <div class="flex-fill">
+          <div class="tip-banner-label">Today's Organic Tip</div>
+          <div class="tip-banner-title">{{ todayTip.title }}</div>
+          <p class="tip-banner-text mb-2">{{ todayTip.tip }}</p>
+          <button class="tip-banner-cta" (click)="goToChat()">
+            <mat-icon style="font-size:13px;width:13px;height:13px;vertical-align:middle">smart_toy</mat-icon>
+            Ask AI for more
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- ── S1c: Hero carousel ───────────────────────────────── -->
+  <!-- ── S1b: Hero carousel ───────────────────────────────── -->
   <div class="hero-card mx-3 mx-md-4 mt-3">
     <div class="hero-track" [style.transform]="'translateX(-' + currentHeroSlide() * 100 + '%)'">
       @for (slide of heroSlides; track slide.imageUrl) {
@@ -621,6 +634,29 @@ function getGreeting(): string {
       padding: 8px 10px; border-radius: 8px;
       font-size: 12px; color: #1a2a1a; line-height: 1.4;
     }
+
+    /* Tip banner */
+    .tip-banner {
+      background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 55%, #43a047 100%);
+      border-radius: 16px;
+      padding: 16px 18px;
+    }
+    .tip-banner-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: rgba(255,255,255,0.18);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .tip-banner-icon mat-icon { color: #fff; font-size: 22px; width: 22px; height: 22px; }
+    .tip-banner-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.65); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+    .tip-banner-title { font-size: 14px; font-weight: 800; color: #fff; margin-bottom: 5px; }
+    .tip-banner-text  { font-size: 12px; color: rgba(255,255,255,0.85); line-height: 1.55; }
+    .tip-banner-cta {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.35);
+      color: #fff; border-radius: 20px; padding: 5px 14px;
+      font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.15s;
+    }
+    .tip-banner-cta:hover { background: rgba(255,255,255,0.3); }
 
     /* Mode card */
     .mode-card { transition: transform 0.15s, box-shadow 0.15s; }
