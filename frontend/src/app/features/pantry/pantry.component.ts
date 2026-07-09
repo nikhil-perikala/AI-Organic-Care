@@ -559,7 +559,7 @@ const QUICK_INGREDIENTS = ['Spinach','Kale','Ginger','Turmeric','Garlic','Almond
 
       <!-- Item list -->
       <div style="overflow-y:auto;flex:1;padding:8px 12px">
-        @for (item of receiptItems(); track $index; let i = $index) {
+        @for (item of receiptItems(); track item.ingredient_name; let i = $index) {
           <div class="receipt-item-row" [class.receipt-item-selected]="selectedReceiptIds().has(i)"
             (click)="toggleReceiptItem(i)">
             <div class="receipt-check">
