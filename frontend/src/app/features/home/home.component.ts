@@ -163,7 +163,16 @@ function getGreeting(): string {
     </div>
   </div>
 
-  <!-- ── S1b: Hero carousel ───────────────────────────────── -->
+  <!-- ── S1b: Daily Tip strip ─────────────────────────────── -->
+  <div class="mx-3 mx-md-4 mt-3">
+    <div class="d-flex align-items-center gap-2 px-3 py-2"
+      style="background:#fffbeb;border-radius:12px;border-left:3px solid #f57c00">
+      <mat-icon style="font-size:16px;width:16px;height:16px;color:#f57c00;flex-shrink:0">lightbulb</mat-icon>
+      <span style="font-size:12px;color:#4a3a1a;line-height:1.4"><strong>Today's Tip:</strong> {{ todayTip }}</span>
+    </div>
+  </div>
+
+  <!-- ── S1c: Hero carousel ───────────────────────────────── -->
   <div class="hero-card mx-3 mx-md-4 mt-3">
     <div class="hero-track" [style.transform]="'translateX(-' + currentHeroSlide() * 100 + '%)'">
       @for (slide of heroSlides; track slide.imageUrl) {
