@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, NgZone } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, NgZone, effect } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -218,6 +218,12 @@ function getGreeting(): string {
       </div>
     </div>
   }
+
+  <!-- ── AI Consciousness Dashboard ──────────────────────── -->
+  <div class="cs-card mx-3 mx-md-4 mt-3">
+    <div class="cs-label">AI Consciousness</div>
+    <canvas class="cs-canvas" #consciousnessCanvas></canvas>
+  </div>
 
   <!-- ── S1b: Hero carousel ───────────────────────────────── -->
   <div class="hero-card mx-3 mx-md-4 mt-3">
@@ -627,6 +633,30 @@ function getGreeting(): string {
 </div>
   `,
   styles: [`
+    /* ── AI Consciousness Dashboard ── */
+    .cs-card {
+      position: relative;
+      border-radius: 20px;
+      overflow: hidden;
+      background: #030b03;
+      height: 200px;
+    }
+    @media (min-width: 768px) { .cs-card { height: 260px; } }
+    .cs-canvas {
+      width: 100%; height: 100%;
+      display: block;
+    }
+    .cs-label {
+      position: absolute;
+      top: 12px; left: 16px;
+      font-size: 11px; font-weight: 600;
+      color: rgba(150,220,150,0.55);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      pointer-events: none;
+      z-index: 1;
+    }
+
     /* ── AI Awakening canvas ── */
     .awakening-canvas {
       position: fixed;
@@ -895,9 +925,12 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   private http = inject(HttpClient);
   private zone = inject(NgZone);
 
-  @ViewChild('awakeningCanvas') private awakeningCanvasRef?: ElementRef<HTMLCanvasElement>;
+  @ViewChild('awakeningCanvas')     private awakeningCanvasRef?: ElementRef<HTMLCanvasElement>;
+  @ViewChild('consciousnessCanvas') private csCanvasRef?: ElementRef<HTMLCanvasElement>;
+
   awakeningDone = signal(!!localStorage.getItem('organic_care_awakened'));
   private awFrame = 0;
+  private csFrame = 0;
 
   greeting    = getGreeting();
   imgFallback = IMG_FALLBACK;
@@ -942,15 +975,28 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  constructor() {
+    // Start consciousness canvas once awakening is finished
+    effect(() => {
+      if (this.awakeningDone()) {
+        setTimeout(() => this.zone.runOutsideAngular(() => this.csInit()), 50);
+      }
+    });
+  }
+
   ngAfterViewInit() {
     if (!this.awakeningDone() && this.awakeningCanvasRef) {
       this.zone.runOutsideAngular(() => this.runAwakening());
+    } else {
+      // First visit already done — start consciousness immediately
+      this.zone.runOutsideAngular(() => this.csInit());
     }
   }
 
   ngOnDestroy() {
     clearInterval(this.heroInterval);
     cancelAnimationFrame(this.awFrame);
+    cancelAnimationFrame(this.csFrame);
   }
 
   private startHeroSlider() {
@@ -1025,6 +1071,171 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   parseSteps(instructions: string | null): string[] {
     if (!instructions) return [];
     return instructions.split(/\n+|\d+\.\s+/).map(s => s.trim()).filter(Boolean);
+  }
+
+  private csInit() {
+    const canvas = this.csCanvasRef?.nativeElement;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+
+    const setSize = () => {
+      canvas.width  = canvas.offsetWidth  || 360;
+      canvas.height = canvas.offsetHeight || 200;
+    };
+    setSize();
+    const resize = () => { setSize(); };
+    window.addEventListener('resize', resize);
+
+    interface Satellite {
+      angle: number;
+      speed: number;
+      orbitR: number;
+      r: number;
+      color: string;
+      glow: string;
+      label: string;
+      getValue: () => string;
+    }
+
+    const isLoggedIn = this.auth.isLoggedIn.bind(this.auth);
+
+    const satellites: Satellite[] = [
+      { angle: 0,              speed: 0.007, orbitR: 0, r: 18, color: '#4caf50', glow: '#81c784', label: 'Pantry',   getValue: () => isLoggedIn() ? String(this.pantryCount())   : '∞' },
+      { angle: Math.PI / 2,   speed: 0.011, orbitR: 0, r: 18, color: '#ff7043', glow: '#ffab91', label: 'Expiring',  getValue: () => isLoggedIn() ? String(this.expiringCount()) : '0' },
+      { angle: Math.PI,        speed: 0.009, orbitR: 0, r: 18, color: '#42a5f5', glow: '#90caf9', label: 'Recipes',  getValue: () => '500+' },
+      { angle: 3 * Math.PI / 2, speed: 0.013, orbitR: 0, r: 18, color: '#ab47bc', glow: '#ce93d8', label: 'AI IQ',  getValue: () => '99%' },
+    ];
+
+    const loop = (now: number) => {
+      const W = canvas.width, H = canvas.height;
+      const CX = W / 2, CY = H / 2;
+      const orbR = Math.min(W, H) * 0.18;
+      const satOrbitR = Math.min(W, H) * 0.36;
+
+      // update satellite orbit radii each frame (canvas may resize)
+      for (const s of satellites) s.orbitR = satOrbitR;
+
+      ctx.clearRect(0, 0, W, H);
+
+      // Background
+      const bg = ctx.createRadialGradient(CX, CY, 0, CX, CY, Math.max(W, H) * 0.6);
+      bg.addColorStop(0, '#0d1f0d');
+      bg.addColorStop(1, '#030b03');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+
+      // Grid rings
+      ctx.strokeStyle = 'rgba(100,200,100,0.06)';
+      ctx.lineWidth = 1;
+      for (let ring = 1; ring <= 3; ring++) {
+        ctx.beginPath();
+        ctx.arc(CX, CY, satOrbitR * ring * 0.45, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // ── Central orb ──────────────────────────────────────────────────────
+      const pulse = 0.5 + 0.5 * Math.sin(now * 0.0025);
+      const wobble = orbR * (0.92 + 0.08 * pulse);
+
+      // Outer aura
+      const aura = ctx.createRadialGradient(CX, CY, 0, CX, CY, wobble * 2.8);
+      aura.addColorStop(0, `rgba(76,175,80,${0.18 + pulse * 0.12})`);
+      aura.addColorStop(0.5, `rgba(76,175,80,0.04)`);
+      aura.addColorStop(1, 'transparent');
+      ctx.beginPath();
+      ctx.arc(CX, CY, wobble * 2.8, 0, Math.PI * 2);
+      ctx.fillStyle = aura;
+      ctx.fill();
+
+      // Orb body — morphing polygon via bezier
+      ctx.save();
+      ctx.translate(CX, CY);
+      ctx.beginPath();
+      const pts = 8;
+      for (let i = 0; i <= pts; i++) {
+        const theta = (i / pts) * Math.PI * 2;
+        const r = wobble * (1 + 0.07 * Math.sin(now * 0.002 + i * 1.3));
+        const x = Math.cos(theta) * r;
+        const y = Math.sin(theta) * r;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      const bodyGrad = ctx.createRadialGradient(-wobble * 0.3, -wobble * 0.3, 0, 0, 0, wobble);
+      bodyGrad.addColorStop(0, '#ffffff');
+      bodyGrad.addColorStop(0.3, '#81c784');
+      bodyGrad.addColorStop(0.7, '#2e7d32');
+      bodyGrad.addColorStop(1, '#1b5e20');
+      ctx.fillStyle = bodyGrad;
+      ctx.shadowColor = '#4caf50';
+      ctx.shadowBlur  = 18 + pulse * 12;
+      ctx.fill();
+      ctx.restore();
+
+      // Orb label
+      ctx.font = `bold ${Math.round(orbR * 0.35)}px "Segoe UI", sans-serif`;
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowBlur = 0;
+      ctx.fillText('🌿', CX, CY);
+
+      // ── Satellites ───────────────────────────────────────────────────────
+      for (const sat of satellites) {
+        sat.angle += sat.speed;
+        const sx = CX + Math.cos(sat.angle) * sat.orbitR;
+        const sy = CY + Math.sin(sat.angle) * sat.orbitR;
+
+        // Orbit trail line
+        ctx.beginPath();
+        ctx.moveTo(CX, CY);
+        ctx.lineTo(sx, sy);
+        ctx.strokeStyle = sat.color + '22';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Satellite glow
+        const satAura = ctx.createRadialGradient(sx, sy, 0, sx, sy, sat.r * 2.5);
+        satAura.addColorStop(0, sat.glow + '55');
+        satAura.addColorStop(1, 'transparent');
+        ctx.beginPath();
+        ctx.arc(sx, sy, sat.r * 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = satAura;
+        ctx.fill();
+
+        // Satellite body
+        const satGrad = ctx.createRadialGradient(sx - sat.r * 0.3, sy - sat.r * 0.3, 0, sx, sy, sat.r);
+        satGrad.addColorStop(0, '#ffffff');
+        satGrad.addColorStop(0.4, sat.color);
+        satGrad.addColorStop(1, sat.color + 'aa');
+        ctx.beginPath();
+        ctx.arc(sx, sy, sat.r, 0, Math.PI * 2);
+        ctx.fillStyle = satGrad;
+        ctx.shadowColor = sat.glow;
+        ctx.shadowBlur  = 10;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Satellite value + label
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = `bold ${Math.round(sat.r * 0.7)}px "Segoe UI", sans-serif`;
+        ctx.fillStyle = '#fff';
+        ctx.fillText(sat.getValue(), sx, sy - 2);
+
+        ctx.font = `${Math.round(sat.r * 0.5)}px "Segoe UI", sans-serif`;
+        ctx.fillStyle = sat.glow;
+        ctx.fillText(sat.label, sx, sy + sat.r + 10);
+      }
+
+      this.csFrame = requestAnimationFrame(loop);
+    };
+
+    this.csFrame = requestAnimationFrame(loop);
+    // Clean up on component destroy — handled by ngOnDestroy
+    canvas.addEventListener('remove', () => {
+      window.removeEventListener('resize', resize);
+      cancelAnimationFrame(this.csFrame);
+    });
   }
 
   private runAwakening() {
