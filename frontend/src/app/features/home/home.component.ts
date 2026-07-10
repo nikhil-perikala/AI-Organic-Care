@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -331,34 +331,50 @@ function getGreeting(): string {
         </div>
       }
     } @else {
-      <div class="recipe-row d-flex d-md-grid gap-3 overflow-x-auto pb-2 d-md-grid">
-        @for (card of recipeCards(); track card.id) {
-          <div class="recipe-card card border-0 shadow-sm flex-shrink-0" style="width:160px;border-radius:14px;cursor:pointer"
-            (click)="openRecipe(card.id)">
-            <div class="d-flex align-items-center justify-content-between px-2 pt-2">
-              <span class="badge text-white rounded-pill" style="font-size:10px" [style.background]="card.matchBg">
-                {{ card.matchPct }}% Match
-              </span>
-              @if (auth.isLoggedIn()) {
-                <button class="btn p-0 border-0 bg-transparent heart-btn"
-                  [class.liked]="favouriteIds().has(card.id)"
-                  (click)="toggleFavourite($event, card.id)">
-                  <mat-icon style="font-size:18px">{{ favouriteIds().has(card.id) ? 'favorite' : 'favorite_border' }}</mat-icon>
-                </button>
-              }
+      <div class="carousel-wrap">
+        <button class="c-arrow c-arrow-l" (click)="scrollCarousel(recipeRow, -1)" aria-label="Previous">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+        <div class="recipe-row d-flex d-md-grid gap-3 pb-2" #recipeRow
+          style="overflow-x:auto;scroll-behavior:smooth;scrollbar-width:none;cursor:grab;-webkit-overflow-scrolling:touch"
+          (mousedown)="carouselDown(recipeRow, $event.clientX)"
+          (mousemove)="carouselMove($event.clientX)"
+          (mouseup)="carouselUp()"
+          (mouseleave)="carouselUp()"
+          (touchstart)="carouselDown(recipeRow, $event.touches[0].clientX)"
+          (touchmove)="carouselMove($event.touches[0].clientX)"
+          (touchend)="carouselUp()">
+          @for (card of recipeCards(); track card.id) {
+            <div class="recipe-card card border-0 shadow-sm flex-shrink-0" style="width:160px;border-radius:14px;cursor:pointer"
+              (click)="openRecipe(card.id)">
+              <div class="d-flex align-items-center justify-content-between px-2 pt-2">
+                <span class="badge text-white rounded-pill" style="font-size:10px" [style.background]="card.matchBg">
+                  {{ card.matchPct }}% Match
+                </span>
+                @if (auth.isLoggedIn()) {
+                  <button class="btn p-0 border-0 bg-transparent heart-btn"
+                    [class.liked]="favouriteIds().has(card.id)"
+                    (click)="toggleFavourite($event, card.id)">
+                    <mat-icon style="font-size:18px">{{ favouriteIds().has(card.id) ? 'favorite' : 'favorite_border' }}</mat-icon>
+                  </button>
+                }
+              </div>
+              <div class="recipe-img-wrap mx-2 my-1">
+                <img [src]="card.imageUrl" [alt]="card.title" class="recipe-thumb-img"
+                     (error)="$any($event.target).src = imgFallback">
+              </div>
+              <div class="card-body p-2">
+                <div class="fw-bold mb-1" style="font-size:12px;color:#1a2a1a">{{ card.title }}</div>
+                <div class="text-muted mb-2" style="font-size:10px">{{ card.time }} • {{ card.difficulty }}</div>
+                <span class="badge rounded-pill fw-semibold" style="font-size:10px;color:#2e7d32"
+                  [style.background]="card.chipBg">{{ card.chip }}</span>
+              </div>
             </div>
-            <div class="recipe-img-wrap mx-2 my-1">
-              <img [src]="card.imageUrl" [alt]="card.title" class="recipe-thumb-img"
-                   (error)="$any($event.target).src = imgFallback">
-            </div>
-            <div class="card-body p-2">
-              <div class="fw-bold mb-1" style="font-size:12px;color:#1a2a1a">{{ card.title }}</div>
-              <div class="text-muted mb-2" style="font-size:10px">{{ card.time }} • {{ card.difficulty }}</div>
-              <span class="badge rounded-pill fw-semibold" style="font-size:10px;color:#2e7d32"
-                [style.background]="card.chipBg">{{ card.chip }}</span>
-            </div>
-          </div>
-        }
+          }
+        </div>
+        <button class="c-arrow c-arrow-r" (click)="scrollCarousel(recipeRow, 1)" aria-label="Next">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
       </div>
     }
   </div>
@@ -375,31 +391,47 @@ function getGreeting(): string {
           <p class="text-muted small mt-2 mb-0">No favourites yet — save a recipe to find it here.</p>
         </div>
       } @else {
-        <div class="d-flex gap-3 overflow-x-auto pb-2">
-          @for (card of favouriteCards(); track card.id) {
-            <div class="recipe-card card border-0 shadow-sm flex-shrink-0" style="width:160px;border-radius:14px;cursor:pointer"
-              (click)="openRecipe(card.id)">
-              <div class="d-flex align-items-center justify-content-between px-2 pt-2">
-                <span class="badge text-white rounded-pill" style="font-size:10px" [style.background]="card.matchBg">
-                  {{ card.matchPct }}% Match
-                </span>
-                <button class="btn p-0 border-0 bg-transparent heart-btn liked"
-                  (click)="toggleFavourite($event, card.id)">
-                  <mat-icon style="font-size:18px">favorite</mat-icon>
-                </button>
+        <div class="carousel-wrap">
+          <button class="c-arrow c-arrow-l" (click)="scrollCarousel(favRow, -1)" aria-label="Previous">
+            <mat-icon>chevron_left</mat-icon>
+          </button>
+          <div class="d-flex gap-3 pb-2" #favRow
+            style="overflow-x:auto;scroll-behavior:smooth;scrollbar-width:none;cursor:grab;-webkit-overflow-scrolling:touch"
+            (mousedown)="carouselDown(favRow, $event.clientX)"
+            (mousemove)="carouselMove($event.clientX)"
+            (mouseup)="carouselUp()"
+            (mouseleave)="carouselUp()"
+            (touchstart)="carouselDown(favRow, $event.touches[0].clientX)"
+            (touchmove)="carouselMove($event.touches[0].clientX)"
+            (touchend)="carouselUp()">
+            @for (card of favouriteCards(); track card.id) {
+              <div class="recipe-card card border-0 shadow-sm flex-shrink-0" style="width:160px;border-radius:14px;cursor:pointer"
+                (click)="openRecipe(card.id)">
+                <div class="d-flex align-items-center justify-content-between px-2 pt-2">
+                  <span class="badge text-white rounded-pill" style="font-size:10px" [style.background]="card.matchBg">
+                    {{ card.matchPct }}% Match
+                  </span>
+                  <button class="btn p-0 border-0 bg-transparent heart-btn liked"
+                    (click)="toggleFavourite($event, card.id)">
+                    <mat-icon style="font-size:18px">favorite</mat-icon>
+                  </button>
+                </div>
+                <div class="recipe-img-wrap mx-2 my-1">
+                  <img [src]="card.imageUrl" [alt]="card.title" class="recipe-thumb-img"
+                     (error)="$any($event.target).src = imgFallback">
+                </div>
+                <div class="card-body p-2">
+                  <div class="fw-bold mb-1" style="font-size:12px;color:#1a2a1a">{{ card.title }}</div>
+                  <div class="text-muted mb-2" style="font-size:10px">{{ card.time }} • {{ card.difficulty }}</div>
+                  <span class="badge rounded-pill fw-semibold" style="font-size:10px;color:#2e7d32"
+                    [style.background]="card.chipBg">{{ card.chip }}</span>
+                </div>
               </div>
-              <div class="recipe-img-wrap mx-2 my-1">
-                <img [src]="card.imageUrl" [alt]="card.title" class="recipe-thumb-img"
-                   (error)="$any($event.target).src = imgFallback">
-              </div>
-              <div class="card-body p-2">
-                <div class="fw-bold mb-1" style="font-size:12px;color:#1a2a1a">{{ card.title }}</div>
-                <div class="text-muted mb-2" style="font-size:10px">{{ card.time }} • {{ card.difficulty }}</div>
-                <span class="badge rounded-pill fw-semibold" style="font-size:10px;color:#2e7d32"
-                  [style.background]="card.chipBg">{{ card.chip }}</span>
-              </div>
-            </div>
-          }
+            }
+          </div>
+          <button class="c-arrow c-arrow-r" (click)="scrollCarousel(favRow, 1)" aria-label="Next">
+            <mat-icon>chevron_right</mat-icon>
+          </button>
         </div>
       }
     </div>
@@ -658,6 +690,24 @@ function getGreeting(): string {
     }
     .tip-banner-cta:hover { background: rgba(255,255,255,0.3); }
 
+    /* Carousel wrapper + arrows */
+    .carousel-wrap { position: relative; }
+    .c-arrow {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      z-index: 2; width: 30px; height: 30px; border-radius: 50%; border: none;
+      background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.14);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: box-shadow 0.15s;
+    }
+    .c-arrow:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.18); }
+    .c-arrow mat-icon { font-size: 18px; width: 18px; height: 18px; color: #2e7d32; }
+    .c-arrow-l { left: -14px; }
+    .c-arrow-r { right: -14px; }
+    @media (min-width: 768px) {
+      .c-arrow-l { left: -16px; }
+      .c-arrow-r { right: -16px; }
+    }
+
     /* Mode card */
     .mode-card { transition: transform 0.15s, box-shadow 0.15s; }
     .mode-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1) !important; }
@@ -820,7 +870,7 @@ function getGreeting(): string {
     }
   `],
 })
-export class HomeComponent implements OnInit, OnDestroy {
+export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   router  = inject(Router);
   auth    = inject(AuthService);
   favSvc  = inject(FavoritesService);
@@ -832,8 +882,14 @@ export class HomeComponent implements OnInit, OnDestroy {
   modeCards   = MODE_CARDS;
   heroSlides  = HERO_SLIDES;
 
+  @ViewChild('recipeRow') private recipeRowEl?: ElementRef<HTMLDivElement>;
+  @ViewChild('favRow')    private favRowEl?:    ElementRef<HTMLDivElement>;
+
   currentHeroSlide = signal(0);
-  private heroInterval?: ReturnType<typeof setInterval>;
+  private heroInterval?:  ReturnType<typeof setInterval>;
+  private recipeTimer?:   ReturnType<typeof setInterval>;
+  private favTimer?:      ReturnType<typeof setInterval>;
+  private drag: { el: HTMLDivElement; x0: number; s0: number } | null = null;
   selectedMood        = signal<string>('');
   loadingRecipes      = signal(true);
   recipeCards         = signal<RecipeCard[]>([]);
@@ -868,8 +924,57 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
+  ngAfterViewInit() {
+    setTimeout(() => {
+      if (this.recipeRowEl?.nativeElement) this.startAuto(this.recipeRowEl.nativeElement, 'recipe');
+      if (this.favRowEl?.nativeElement)    this.startAuto(this.favRowEl.nativeElement, 'fav');
+    }, 3000);
+  }
+
   ngOnDestroy() {
     clearInterval(this.heroInterval);
+    clearInterval(this.recipeTimer);
+    clearInterval(this.favTimer);
+  }
+
+  private startAuto(el: HTMLDivElement, ref: 'recipe' | 'fav') {
+    clearInterval(ref === 'recipe' ? this.recipeTimer : this.favTimer);
+    const t = setInterval(() => {
+      if (el.scrollWidth <= el.clientWidth) return;
+      if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 4)
+        el.scrollTo({ left: 0, behavior: 'smooth' });
+      else
+        el.scrollBy({ left: 172, behavior: 'smooth' });
+    }, 3000);
+    if (ref === 'recipe') this.recipeTimer = t;
+    else this.favTimer = t;
+  }
+
+  scrollCarousel(el: HTMLDivElement, dir: number) {
+    el.scrollBy({ left: dir * 172, behavior: 'smooth' });
+  }
+
+  carouselDown(el: HTMLDivElement, x: number) {
+    clearInterval(this.recipeTimer);
+    clearInterval(this.favTimer);
+    this.drag = { el, x0: x, s0: el.scrollLeft };
+    el.style.cursor = 'grabbing';
+  }
+
+  carouselMove(x: number) {
+    if (!this.drag) return;
+    this.drag.el.scrollLeft = this.drag.s0 + (this.drag.x0 - x);
+  }
+
+  carouselUp() {
+    if (this.drag) {
+      this.drag.el.style.cursor = 'grab';
+      setTimeout(() => {
+        if (this.recipeRowEl?.nativeElement) this.startAuto(this.recipeRowEl.nativeElement, 'recipe');
+        if (this.favRowEl?.nativeElement)    this.startAuto(this.favRowEl.nativeElement, 'fav');
+      }, 2000);
+    }
+    this.drag = null;
   }
 
   private startHeroSlider() {
