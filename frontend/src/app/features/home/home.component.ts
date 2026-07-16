@@ -437,69 +437,6 @@ function getGreeting(): string {
     </div>
   }
 
-  <!-- ── S6: Bottom cards ──────────────────────────────────── -->
-  <div class="px-3 px-md-4 mt-3 pb-5">
-    <div class="row g-3">
-
-      <!-- Quick Pantry Actions card -->
-      <div class="col-6">
-        <div class="bottom-card position-relative overflow-hidden" style="background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border-radius:18px;min-height:200px">
-          <div class="p-3" style="position:relative;z-index:1">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <div style="width:32px;height:32px;border-radius:8px;background:rgba(46,125,50,0.15);display:flex;align-items:center;justify-content:center">
-                <mat-icon style="font-size:18px;width:18px;height:18px;color:#2e7d32">kitchen</mat-icon>
-              </div>
-              <span class="fw-bold" style="font-size:13px;color:#1a2a1a">My Pantry</span>
-            </div>
-            <div class="d-flex flex-column gap-1 mb-3">
-              <div class="d-flex align-items-center gap-2">
-                <span class="fw-bold" style="font-size:22px;color:#2e7d32">{{ pantryCount }}</span>
-                <span class="text-muted" style="font-size:11px">items tracked</span>
-              </div>
-
-              @if (recipeCount > 0) {
-                <div class="d-flex align-items-center gap-1" style="font-size:11px;color:#6a1b9a">
-                  <mat-icon style="font-size:13px;width:13px;height:13px">dinner_dining</mat-icon>
-                  {{ recipeCount }} recipe matches
-                </div>
-              }
-            </div>
-            <button class="btn fw-semibold d-flex align-items-center gap-1"
-              style="background:#2e7d32;color:#fff;border-radius:22px;font-size:12px;padding:8px 16px;border:none"
-              routerLink="/pantry">
-              <mat-icon style="font-size:14px;width:14px;height:14px">kitchen</mat-icon>
-              View Pantry
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Today's Tip card -->
-      <div class="col-6">
-        <div class="bottom-card position-relative overflow-hidden" style="background:#fffbeb;border-radius:18px;min-height:200px">
-          <div class="p-3" style="position:relative;z-index:1">
-            <div class="d-flex align-items-center gap-2 mb-1">
-              <div style="width:32px;height:32px;border-radius:8px;background:rgba(245,124,0,0.12);display:flex;align-items:center;justify-content:center">
-                <mat-icon style="font-size:18px;width:18px;height:18px;color:#f57c00">lightbulb</mat-icon>
-              </div>
-              <span class="fw-bold" style="font-size:13px;color:#1a2a1a">Today's Tip</span>
-            </div>
-            <p style="font-size:12px;color:#4a3a1a;line-height:1.55;margin-bottom:0.75rem">{{ todayTip }}</p>
-            <button class="btn btn-sm fw-semibold d-flex align-items-center gap-1"
-              style="border:1.5px solid #f57c00;color:#f57c00;border-radius:22px;font-size:12px;background:transparent;padding:6px 14px"
-              (click)="goToChat()">
-              <mat-icon style="font-size:13px;width:13px;height:13px">smart_toy</mat-icon>
-              Ask AI
-            </button>
-          </div>
-          <img src="https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=300&auto=format&fit=crop&q=80"
-               class="bottom-card-img" alt="Healthy drink">
-        </div>
-      </div>
-
-    </div>
-  </div>
-
   <!-- ── Recipe Detail Modal ──────────────────────────────── -->
   @if (recipeModalOpen()) {
     <div class="modal-backdrop-custom" (click)="closeRecipe()">
