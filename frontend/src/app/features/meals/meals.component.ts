@@ -28,16 +28,43 @@ interface RecipeDetail {
   image_url: string | null;
 }
 
-interface DefaultCard { title: string; cuisine: string; time: number; icon: string; }
+interface DefaultCard { title: string; cuisine: string; time: number; icon: string; meal: string; }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const DEFAULT_EXPLORE: DefaultCard[] = [
-  { title: 'Egg Curry',            cuisine: 'Indian',  time: 30, icon: 'egg'   },
-  { title: 'Spaghetti Carbonara',  cuisine: 'Italian', time: 25, icon: 'bread' },
-  { title: 'Chicken Stir Fry',     cuisine: 'Chinese', time: 20, icon: 'meat'  },
-  { title: 'Dal Tadka',            cuisine: 'Indian',  time: 35, icon: 'leaf'  },
-  { title: 'Mushroom Risotto',     cuisine: 'Italian', time: 40, icon: 'salad' },
+  // Breakfast
+  { title: 'Masala Omelette',       cuisine: 'Indian',        time: 12, icon: 'egg',            meal: 'breakfast' },
+  { title: 'Avocado Toast',         cuisine: 'American',      time: 10, icon: 'bread',          meal: 'breakfast' },
+  { title: 'Greek Yogurt Parfait',  cuisine: 'Mediterranean', time: 8,  icon: 'bowl-chopsticks',meal: 'breakfast' },
+  { title: 'Banana Oat Pancakes',   cuisine: 'American',      time: 15, icon: 'leaf',           meal: 'breakfast' },
+  // Lunch
+  { title: 'Dal Tadka',             cuisine: 'Indian',        time: 35, icon: 'leaf',           meal: 'lunch'     },
+  { title: 'Chicken Caesar Salad',  cuisine: 'American',      time: 15, icon: 'salad',          meal: 'lunch'     },
+  { title: 'Tomato Basil Soup',     cuisine: 'Italian',       time: 25, icon: 'bowl-chopsticks',meal: 'lunch'     },
+  { title: 'Falafel Wrap',          cuisine: 'Mediterranean', time: 20, icon: 'bread',          meal: 'lunch'     },
+  { title: 'Tuna Sandwich',         cuisine: 'American',      time: 10, icon: 'fish',           meal: 'lunch'     },
+  // Dinner
+  { title: 'Egg Curry',             cuisine: 'Indian',        time: 30, icon: 'egg',            meal: 'dinner'    },
+  { title: 'Spaghetti Carbonara',   cuisine: 'Italian',       time: 25, icon: 'bread',          meal: 'dinner'    },
+  { title: 'Chicken Stir Fry',      cuisine: 'Chinese',       time: 20, icon: 'bowl-chopsticks',meal: 'dinner'    },
+  { title: 'Mushroom Risotto',      cuisine: 'Italian',       time: 40, icon: 'salad',          meal: 'dinner'    },
+  { title: 'Butter Chicken',        cuisine: 'Indian',        time: 40, icon: 'bowl-chopsticks',meal: 'dinner'    },
+  { title: 'Teriyaki Salmon',       cuisine: 'Japanese',      time: 25, icon: 'fish',           meal: 'dinner'    },
+  { title: 'Shakshuka',             cuisine: 'Mediterranean', time: 25, icon: 'egg',            meal: 'dinner'    },
+  // Snacks
+  { title: 'Hummus with Veggies',   cuisine: 'Mediterranean', time: 10, icon: 'carrot',         meal: 'snack'     },
+  { title: 'Fruit Smoothie Bowl',   cuisine: 'American',      time: 8,  icon: 'apple',          meal: 'snack'     },
+  { title: 'Roasted Chickpeas',     cuisine: 'Indian',        time: 20, icon: 'leaf',           meal: 'snack'     },
+];
+
+const EXPLORE_CATEGORIES = [
+  { key: 'all',       label: 'All',       icon: 'apps'            },
+  { key: 'breakfast', label: 'Breakfast', icon: 'coffee'          },
+  { key: 'lunch',     label: 'Lunch',     icon: 'salad'           },
+  { key: 'dinner',    label: 'Dinner',    icon: 'moon'            },
+  { key: 'snack',     label: 'Snacks',    icon: 'apple'           },
+  { key: 'quick',     label: 'Quick',     icon: 'bolt'            },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -313,28 +340,76 @@ function claudeCardToDetail(r: any): RecipeDetail {
         }
 
         @if (!searchLoading()) {
-          <div class="section-label mt-4">
-            <i class="ti ti-star"></i> Popular Recipes
-          </div>
-          <div class="card-list mt-2">
-            @for (d of defaultExplore; track d.title) {
-              <div class="recipe-card" (click)="fetchAndShowDetail(d.title)">
-                @if (recipeImages()[d.title]; as src) {
-                  <img [src]="src" [alt]="d.title" class="card-thumb">
-                } @else {
-                  <div class="card-icon"><i class="ti ti-{{ d.icon }}"></i></div>
-                }
-                <div class="card-body">
-                  <div class="card-name">{{ d.title }}</div>
-                  <div class="card-meta">
-                    <span><i class="ti ti-clock"></i> {{ d.time }} min</span>
-                    <span><i class="ti ti-world"></i> {{ d.cuisine }}</span>
-                  </div>
-                </div>
-                <i class="ti ti-chevron-right chevron-ico"></i>
-              </div>
+
+          <!-- Category filter chips -->
+          <div class="cat-chips mt-3">
+            @for (cat of exploreCategories; track cat.key) {
+              <button class="cat-chip" [class.cat-chip-active]="exploreCategory() === cat.key"
+                (click)="exploreCategory.set(cat.key)">
+                <i class="ti ti-{{ cat.icon }}"></i> {{ cat.label }}
+              </button>
             }
           </div>
+
+          <!-- Grouped view when "All" selected -->
+          @if (exploreSections(); as sections) {
+            @for (section of sections; track section.label) {
+              <div class="section-label mt-4">
+                <i class="ti ti-{{ section.icon }}"></i> {{ section.label }}
+              </div>
+              <div class="card-list mt-2">
+                @for (d of section.items; track d.title) {
+                  <div class="recipe-card" (click)="fetchAndShowDetail(d.title)">
+                    @if (recipeImages()[d.title]; as src) {
+                      <img [src]="src" [alt]="d.title" class="card-thumb">
+                    } @else {
+                      <div class="card-icon"><i class="ti ti-{{ d.icon }}"></i></div>
+                    }
+                    <div class="card-body">
+                      <div class="card-name">{{ d.title }}</div>
+                      <div class="card-meta">
+                        <span><i class="ti ti-clock"></i> {{ d.time }} min</span>
+                        <span><i class="ti ti-world"></i> {{ d.cuisine }}</span>
+                      </div>
+                    </div>
+                    <i class="ti ti-chevron-right chevron-ico"></i>
+                  </div>
+                }
+              </div>
+            }
+          } @else {
+            <!-- Filtered view for specific category -->
+            @if (filteredExplore().length === 0) {
+              <div class="empty-state" style="padding: 40px 24px">
+                <i class="ti ti-search-off empty-ico"></i>
+                <p>No recipes in this category yet.</p>
+              </div>
+            } @else {
+              <div class="section-label mt-4">
+                <i class="ti ti-sparkles"></i> {{ filteredExplore().length }} recipes
+              </div>
+              <div class="card-list mt-2">
+                @for (d of filteredExplore(); track d.title) {
+                  <div class="recipe-card" (click)="fetchAndShowDetail(d.title)">
+                    @if (recipeImages()[d.title]; as src) {
+                      <img [src]="src" [alt]="d.title" class="card-thumb">
+                    } @else {
+                      <div class="card-icon"><i class="ti ti-{{ d.icon }}"></i></div>
+                    }
+                    <div class="card-body">
+                      <div class="card-name">{{ d.title }}</div>
+                      <div class="card-meta">
+                        <span><i class="ti ti-clock"></i> {{ d.time }} min</span>
+                        <span><i class="ti ti-world"></i> {{ d.cuisine }}</span>
+                      </div>
+                    </div>
+                    <i class="ti ti-chevron-right chevron-ico"></i>
+                  </div>
+                }
+              </div>
+            }
+          }
+
         }
 
       </div>
@@ -596,6 +671,23 @@ function claudeCardToDetail(r: any): RecipeDetail {
     .match-badge.match-mid  { background: var(--amber); }
     .chevron-ico { font-size: 18px; color: var(--text-muted); flex-shrink: 0; }
 
+    /* Category chips */
+    .cat-chips {
+      display: flex; gap: 8px; overflow-x: auto;
+      padding-bottom: 6px; scrollbar-width: none;
+    }
+    .cat-chips::-webkit-scrollbar { display: none; }
+    .cat-chip {
+      display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+      white-space: nowrap; padding: 7px 14px; border-radius: 20px;
+      border: 1.5px solid var(--border); background: var(--surface);
+      font-size: 12px; font-weight: 500; color: var(--text-muted);
+      cursor: pointer; transition: all 0.18s;
+    }
+    .cat-chip i { font-size: 14px; }
+    .cat-chip:hover { border-color: var(--green); background: var(--green-l); color: var(--green); }
+    .cat-chip.cat-chip-active { background: var(--green); border-color: var(--green); color: #fff; }
+
     /* Search */
     .search-wrap {
       display: flex; align-items: center; gap: 10px;
@@ -763,15 +855,36 @@ export class MealsComponent implements OnInit {
   });
 
   // ── Explore ───────────────────────────────────────────────────────────────
-  searchQuery   = '';
-  searchFocused = false;
-  searchLoading = signal(false);
-  searchError   = false;
-  exploreDetail = signal<RecipeDetail | null>(null);
-  loadingMsg    = signal('Asking the AI chef…');
+  searchQuery     = '';
+  searchFocused   = false;
+  searchLoading   = signal(false);
+  searchError     = false;
+  exploreDetail   = signal<RecipeDetail | null>(null);
+  loadingMsg      = signal('Asking the AI chef…');
+  exploreCategory = signal('all');
   private msgTimer: ReturnType<typeof setInterval> | null = null;
 
-  readonly defaultExplore = DEFAULT_EXPLORE;
+  readonly defaultExplore    = DEFAULT_EXPLORE;
+  readonly exploreCategories = EXPLORE_CATEGORIES;
+
+  filteredExplore = computed(() => {
+    const cat = this.exploreCategory();
+    if (cat === 'all')   return DEFAULT_EXPLORE;
+    if (cat === 'quick') return DEFAULT_EXPLORE.filter(d => d.time <= 20);
+    return DEFAULT_EXPLORE.filter(d => d.meal === cat);
+  });
+
+  exploreSections = computed(() => {
+    if (this.exploreCategory() !== 'all') return null;
+    const groups: Record<string, { label: string; icon: string; items: DefaultCard[] }> = {
+      breakfast: { label: 'Breakfast',  icon: 'coffee', items: [] },
+      lunch:     { label: 'Lunch',      icon: 'salad',  items: [] },
+      dinner:    { label: 'Dinner',     icon: 'moon',   items: [] },
+      snack:     { label: 'Snacks',     icon: 'apple',  items: [] },
+    };
+    DEFAULT_EXPLORE.forEach(d => { if (groups[d.meal]) groups[d.meal].items.push(d); });
+    return Object.values(groups).filter(g => g.items.length > 0);
+  });
 
   // ── Images ────────────────────────────────────────────────────────────────
   recipeImages = signal<Record<string, string | null>>({});
