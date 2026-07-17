@@ -108,6 +108,35 @@ function parseSteps(instructions: string | null): string[] {
         }
       </div>
 
+      <!-- ── Quick & Easy ─────────────────────────────────────── -->
+      @if (!pantryLoading() && !localSearch() && quickEasyRecipes().length > 0) {
+        <div class="rec-section" style="margin-bottom:28px">
+          <div class="rec-section-hdr">
+            <h2 class="rec-section-title d-flex align-items-center gap-2">
+              <mat-icon style="font-size:18px;width:18px;height:18px;color:#f57c00;vertical-align:middle">bolt</mat-icon>
+              Quick &amp; Easy
+            </h2>
+            <span class="rec-count">Under 20 mins</span>
+          </div>
+          <div class="qe-row">
+            @for (pr of quickEasyRecipes(); track pr.recipe.id) {
+              <div class="qe-card" (click)="openModal(pr)">
+                <img [src]="recipeImgUrl(pr.recipe.title, pr.recipe.meal_type)"
+                     [alt]="pr.recipe.title" class="qe-img"
+                     (error)="$any($event.target).src = fallbackImg">
+                <div class="qe-body">
+                  <div class="qe-title">{{ pr.recipe.title }}</div>
+                  <div class="qe-meta">
+                    <mat-icon style="font-size:11px;width:11px;height:11px;color:#f57c00">timer</mat-icon>
+                    {{ totalMin(pr.recipe) }} min
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
       <!-- ── Recommended Meals ───────────────────────────────── -->
       <div class="rec-section">
         <div class="rec-section-hdr">
@@ -430,6 +459,24 @@ function parseSteps(instructions: string | null): string[] {
       font-size: 12px; color: #9e9e9e; font-weight: 500;
     }
 
+    /* ── Quick & Easy strip ─────────────────────────────────── */
+    .qe-row {
+      display: flex; gap: 10px;
+      overflow-x: auto; padding-bottom: 6px; scrollbar-width: none;
+    }
+    .qe-row::-webkit-scrollbar { display: none; }
+    .qe-card {
+      flex-shrink: 0; width: 130px; border-radius: 12px;
+      background: #fff; overflow: hidden; cursor: pointer;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07); border: 1.5px solid #e0ede0;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .qe-card:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,0.1); border-color: #4caf50; }
+    .qe-img { width: 100%; height: 80px; object-fit: cover; display: block; }
+    .qe-body { padding: 8px 9px; }
+    .qe-title { font-size: 11px; font-weight: 700; color: #1a2a1a; line-height: 1.35; margin-bottom: 4px; }
+    .qe-meta { display: flex; align-items: center; gap: 3px; font-size: 10px; color: #9e9e9e; }
+
     /* ── Recipe cards ────────────────────────────────────────── */
     .meals-grid {
       display: grid;
@@ -632,6 +679,12 @@ export class RecommendationsComponent implements OnInit {
   ];
 
   // ── Computed ──────────────────────────────────────────────────────────────
+  quickEasyRecipes = computed(() =>
+    this.pantryRecipes()
+      .filter(pr => { const t = this.totalMin(pr.recipe); return t > 0 && t <= 20; })
+      .slice(0, 10)
+  );
+
   filteredPantryRecipes = computed(() => this.pantryRecipes());
 
   displayRecipes = computed(() => {
